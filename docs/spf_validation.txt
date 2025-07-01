@@ -1,0 +1,55 @@
+Syntax Check: Parse the SPF record string. Ensure it begins with v=spf1 and that mechanisms are space-separated. 
+The record can contain mechanisms like ip4, ip6, a, mx, include, exists, redirect, and an all mechanism 
+(with qualifiers). Verify that no unsupported mechanisms or malformed entries are present (e.g. missing colons or
+ prefixes).
+ 
+ All Mechanism Usage: Check the “all” mechanism at the end of the record and its qualifier:
+
+
+-all (Fail) – hard fail (mail not from listed sources should be rejected). This is a strict policy.
+~all (SoftFail) – soft fail (non-listed sources are not authorized, but not an outright reject; often marked spam).
+?all (Neutral) – no policy (treated as if no SPF at all). Not recommended .
++all (Pass) – authorize any sender. This nullifies SPF’s security and should never be used .
+ Ensure the qualifier is appropriate for the domain’s enforcement needs (most domains should use ~all or -all and avoid the neutral or pass-all qualifiers ).
+
+only one redirect is allowed, and it should appear at end instead of “all”
+
+DNS Lookup Limit: Count the number of DNS lookups the SPF record will trigger. According to RFC 7208, an SPF check 
+must not exceed 10 DNS lookups, including those caused by include, a, mx, ptr, and exists mechanisms (while ip4, ip6,
+ and all do not incur lookups) . If your SPF record’s mechanisms would require more than 10 lookups, the SPF 
+ evaluation results in a PermError (permanent error) and receivers will treat SPF as failed . An audit tool should 
+ detect this condition (often phrased as “too many DNS lookups”) and flag it.
+
+ Length and Formatting: Ensure the record is within DNS length limits (a single TXT record should be ≤255 characters, 
+ but DNS allows splitting into multiple quoted strings which are concatenated). The tool should recombine and verify 
+ the full SPF string.
+
+ Common Misconfigurations to Flag:
+
+Multiple SPF records: As noted, having more than one SPF TXT record invalidates SPF . The fix is to merge into one 
+record.
+Missing “all” mechanism: An SPF record without an all at the end is incomplete; receivers might interpret it as if
+ unlisted senders are neutral (not explicitly unauthorized). Best practice is to include an all mechanism (usually 
+ ~all during rollout, then -all once confident) .
+Using +all: This means “allow any sender” and defeats the purpose of SPF. It should be treated as a critical 
+misconfiguration (equivalent to having no SPF protection) .
+Deprecated mechanisms: The ptr mechanism is discouraged due to its slow and unreliable nature; if present, warn the 
+user (replace with ip mechanisms or includes) .
+Exceeding lookup limit: If includes/redirects sum to >10 lookups, SPF will PermError and fail . Advise simplifying
+ the SPF (e.g. remove unnecessary includes, use SPF flattening, or subdomains to delegate third-party senders ).
+Syntax errors: e.g., missing spaces, stray punctuation, or wrong use of qualifiers will break the record. A robust 
+parser or SPF library (like pyspf or Mail::SPF) can be used to validate format in the tool .
+
+SPF Best Practices
+Publish a Single SPF Record: Always maintain one consolidated SPF record per domain . If you need to authorize multiple services (e.g., your own mail server + a marketing platform), merge their includes into one record. (Multiple v=spf1 records will cause SPF to fail validation .) Use tools or SPF generators if necessary to combine records without syntax errors.
+List All Legitimate Sending Sources: Ensure every server or third-party that sends email using your domain is covered by the SPF record. This means including the appropriate ip4:/ip6: addresses or include: subdomains provided by your email service providers. Keep this list up to date; remove entries for services you no longer use to minimize exposure.
+Avoid Exceeding DNS Lookup Limits: As noted, SPF lookups are limited to 10. To stay within this limit:
+Use ip4/ip6 mechanisms for static IPs instead of excessive includes where possible.
+If using many third-party senders, consider SPF flattening (resolving includes to IPs at publish time) or designate subdomains for some mail streams (so each domain’s SPF is shorter). Monitor for the “permerror too many lookups” condition regularly .
+End with a Failing all Mechanism: Conclude the SPF record with -all or ~all to define the default rule. Do not use +all or omit “all”, as that would allow unauthorized senders to pass SPF . Typically:
+Use ~all (Soft fail) initially if you are unsure you’ve covered all senders. This will mark non-compliant senders but not outright reject mails – useful during a deployment/monitoring phase.
+Once confident, switch to -all (Hard fail) so that any server not in your SPF is explicitly unauthorized (many receivers will then reject or spam-folder those emails). A hard fail gives the strongest protection against spoofing.
+Use Proper Qualifiers for Third-Parties: When including third-party services, use the include: mechanism (which will honor that service’s SPF rules). Do not use mechanisms like a or mx pointing to external domains unless you control them, as those could inadvertently authorize broad ranges of hosts. Prefer include:service.com entries that are maintained by those providers.
+Minimize Use of Deprecated Mechanisms: Avoid using ptr (which is deprecated for SPF and slow) . The exists mechanism is rarely needed. Stick to the common ones: ip4, ip6, a, mx, and include.
+Neutral vs. Fail Policy: Generally, do not use ?all (neutral) because it signals no policy at all . It is effectively the same as having no SPF protection. The only time ?all might appear is in very early testing, but even then, it’s better to use ~all for visibility. Major providers expect domains to assert a clear policy (-all or ~all); for example, Yahoo explicitly advises against neutral policies and to use soft or hard fail .
+Monitor and Adjust: SPF alone doesn’t offer reporting, but you can use DMARC aggregate reports to see SPF authentication results. If you get reports of SPF failures for legitimate mail, update your SPF record accordingly. This iterative tuning is essential, especially for large organizations using many services.
