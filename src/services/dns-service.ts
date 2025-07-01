@@ -39,3 +39,5 @@ export async function checkDnsRegistration(domain: string) {
 	}
 }
 
+
+

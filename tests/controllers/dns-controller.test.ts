@@ -1,4 +1,3 @@
-
 import { Context } from "hono";
 import { checkDns } from "../../src/controllers/dns-controller";
 import * as dnsService from "../../src/services/dns-service";
@@ -9,35 +8,43 @@ jest.mock("../../src/services/dns-service");
 describe("checkDns controller", () => {
 	let c: Context;
 
+	// Helper to create a mock Hono Context
+	const createMockContext = (queryValue?: string) => {
+		const mockQuery = jest.fn().mockReturnValue(queryValue);
+		const mockJson = jest.fn();
+		return {
+			req: { query: mockQuery },
+			json: mockJson,
+		} as unknown as Context;
+	};
+
+	// Helper to mock dnsService.checkDnsRegistration
+	const mockDnsServiceResult = (result: any) => (dnsService.checkDnsRegistration as jest.Mock).mockResolvedValue(result);
+	const mockDnsServiceError = (error: Error) => (dnsService.checkDnsRegistration as jest.Mock).mockRejectedValue(error);
+
 	beforeEach(() => {
 		// Reset mocks before each test
 		jest.clearAllMocks();
-
-		// Mock Hono context
-		c = {
-			req: {
-				query: jest.fn(),
-			},
-			json: jest.fn(),
-		} as unknown as Context;
+		// Initialize a fresh mock Hono context for each test
+		c = createMockContext();
 	});
 
 	it("should return a 400 error if the domain parameter is missing", async () => {
-		(c.req.query as jest.Mock).mockReturnValue(undefined);
+		(c.req.query as jest.Mock).mockReturnValue(undefined); // Directly mock query for this specific test
 		await checkDns(c);
 		expect(c.json).toHaveBeenCalledWith({ error: "Domain parameter is required" }, 400);
 	});
 
 	it("should return a 400 error for an invalid domain format", async () => {
-		(c.req.query as jest.Mock).mockReturnValue("invalid-domain");
+		(c.req.query as jest.Mock).mockReturnValue("invalid-domain"); // Directly mock query for this specific test
 		await checkDns(c);
 		expect(c.json).toHaveBeenCalledWith({ error: "Invalid domain format" }, 400);
 	});
 
 	it("should call the DNS service and return the result for a valid domain", async () => {
 		const mockResult = { domain: "google.com", isRegistered: true };
-		(c.req.query as jest.Mock).mockReturnValue("google.com");
-		(dnsService.checkDnsRegistration as jest.Mock).mockResolvedValue(mockResult);
+		(c.req.query as jest.Mock).mockReturnValue("google.com"); // Directly mock query for this specific test
+		mockDnsServiceResult(mockResult);
 
 		await checkDns(c);
 
@@ -46,10 +53,8 @@ describe("checkDns controller", () => {
 	});
 
 	it("should return a 500 error if the DNS service throws an error", async () => {
-		(c.req.query as jest.Mock).mockReturnValue("google.com");
-		(dnsService.checkDnsRegistration as jest.Mock).mockRejectedValue(
-			new Error("Service error")
-		);
+		(c.req.query as jest.Mock).mockReturnValue("google.com"); // Directly mock query for this specific test
+		mockDnsServiceError(new Error("Service error"));
 
 		await checkDns(c);
 

@@ -15,6 +15,7 @@
         "jest",
         "node"
     ],
-    "outDir": "dist"
+    "outDir": "dist",
+    "esModuleInterop": true
   },
 }
