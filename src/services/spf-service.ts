@@ -6,9 +6,10 @@ interface DnsResponse {
 interface SpfRecordObject {
 	domain: string;
 	spfRecord: string;
+	type: 'initial' | 'include' | 'redirect';
 }
 
-export async function getSpfRecord(domain: string, visitedDomains: Set<string> = new Set()): Promise<SpfRecordObject[]> {
+export async function getSpfRecord(domain: string, visitedDomains: Set<string> = new Set(), recordType: 'initial' | 'include' | 'redirect' = 'initial'): Promise<SpfRecordObject[]> {
 	if (visitedDomains.has(domain)) {
 		console.log(`Circular dependency detected for domain: ${domain}. Skipping.`);
 		return [];
@@ -41,7 +42,7 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 				if (record.type === 16 && record.data.replace(/"/g, '').startsWith("v=spf1")) { // Type 16 is TXT
 					let spfRecord = record.data;
 					console.log(`DoH TXT response for ${domain}:`, record);
-					spfRecords.push({ domain, spfRecord });
+										spfRecords.push({ domain, spfRecord, type: recordType });
 
 					// Handle includes
 					const includeRegex = /include:([\w.-]+)/g;
@@ -49,7 +50,7 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 					while ((match = includeRegex.exec(spfRecord)) !== null) {
 						const includedDomain = match[1];
 						console.log(`Found include mechanism for domain: ${includedDomain}`);
-						const includedSpfRecords = await getSpfRecord(includedDomain, visitedDomains);
+						const includedSpfRecords = await getSpfRecord(includedDomain, visitedDomains, 'include');
 						spfRecords.push(...includedSpfRecords);
 					}
 
@@ -59,7 +60,7 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 					if (match) {
 						const redirectedDomain = match[1];
 						console.log(`Found redirect mechanism for domain: ${redirectedDomain}`);
-						const redirectedSpfRecords = await getSpfRecord(redirectedDomain, visitedDomains);
+						const redirectedSpfRecords = await getSpfRecord(redirectedDomain, visitedDomains, 'redirect');
 						spfRecords.push(...redirectedSpfRecords);
 					}
 				}

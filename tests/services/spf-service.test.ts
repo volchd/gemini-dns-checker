@@ -24,8 +24,8 @@ describe("getSpfRecord", () => {
 
 		const spfRecords = await getSpfRecord("example.com");
 		expect(spfRecords).toEqual([
-			{ domain: "example.com", spfRecord: "v=spf1 include:_spf.google.com ~all" },
-			{ domain: "_spf.google.com", spfRecord: "v=spf1 ip4:1.2.3.4 ~all" },
+			{ domain: "example.com", spfRecord: "v=spf1 include:_spf.google.com ~all", type: 'initial' },
+			{ domain: "_spf.google.com", spfRecord: "v=spf1 ip4:1.2.3.4 ~all", type: 'include' },
 		]);
 	});
 
@@ -44,8 +44,8 @@ describe("getSpfRecord", () => {
 
 		const spfRecords = await getSpfRecord("example.com");
 		expect(spfRecords).toEqual([
-			{ domain: "example.com", spfRecord: "v=spf1 include:sub.example.com ~all" },
-			{ domain: "sub.example.com", spfRecord: "v=spf1 ip4:192.0.2.1 -all" },
+			{ domain: "example.com", spfRecord: "v=spf1 include:sub.example.com ~all", type: 'initial' },
+			{ domain: "sub.example.com", spfRecord: "v=spf1 ip4:192.0.2.1 -all", type: 'include' },
 		]);
 	});
 
@@ -57,8 +57,8 @@ describe("getSpfRecord", () => {
 
 		const spfRecords = await getSpfRecord("example.com");
 		expect(spfRecords).toEqual([
-			{ domain: "example.com", spfRecord: "v=spf1 redirect=redirect.example.com" },
-			{ domain: "redirect.example.com", spfRecord: "v=spf1 ip4:192.0.2.2 +all" },
+			{ domain: "example.com", spfRecord: "v=spf1 redirect=redirect.example.com", type: 'initial' },
+			{ domain: "redirect.example.com", spfRecord: "v=spf1 ip4:192.0.2.2 +all", type: 'redirect' },
 		]);
 	});
 
@@ -69,7 +69,7 @@ describe("getSpfRecord", () => {
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [])); // No SPF record
 
 		const spfRecords = await getSpfRecord("example.com");
-		expect(spfRecords).toEqual([{ domain: "example.com", spfRecord: "v=spf1 include:no-spf.example.com ~all" }]);
+		expect(spfRecords).toEqual([{ domain: "example.com", spfRecord: "v=spf1 include:no-spf.example.com ~all", type: 'initial' }]);
 	});
 
 	it("should return an array with the original SPF record if redirected domain has no SPF record", async () => {
@@ -79,7 +79,7 @@ describe("getSpfRecord", () => {
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [])); // No SPF record
 
 		const spfRecords = await getSpfRecord("example.com");
-		expect(spfRecords).toEqual([{ domain: "example.com", spfRecord: "v=spf1 redirect=no-spf.example.com" }]);
+		expect(spfRecords).toEqual([{ domain: "example.com", spfRecord: "v=spf1 redirect=no-spf.example.com", type: 'initial' }]);
 	});
 
 	it("should throw an error if the DoH query for TXT records fails", async () => {
