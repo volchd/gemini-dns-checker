@@ -3,10 +3,15 @@ interface DnsResponse {
 	Answer?: { name: string; type: number; TTL: number; data: string }[];
 }
 
-export async function getSpfRecord(domain: string, visitedDomains: Set<string> = new Set()): Promise<string | null> {
+interface SpfRecordObject {
+	domain: string;
+	spfRecord: string;
+}
+
+export async function getSpfRecord(domain: string, visitedDomains: Set<string> = new Set()): Promise<SpfRecordObject[]> {
 	if (visitedDomains.has(domain)) {
 		console.log(`Circular dependency detected for domain: ${domain}. Skipping.`);
-		return null;
+		return [];
 	}
 	visitedDomains.add(domain);
 
@@ -28,12 +33,15 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 		}
 
 		const dnsResponse: DnsResponse = await response.json();
-		console.log(`DoH TXT response for ${domain}:`, dnsResponse);
+		//console.log(`DoH TXT response for ${domain}:`, dnsResponse);
 
+		const spfRecords: SpfRecordObject[] = [];
 		if (dnsResponse.Answer) {
 			for (const record of dnsResponse.Answer) {
 				if (record.type === 16 && record.data.replace(/"/g, '').startsWith("v=spf1")) { // Type 16 is TXT
 					let spfRecord = record.data;
+					console.log(`DoH TXT response for ${domain}:`, record);
+					spfRecords.push({ domain, spfRecord });
 
 					// Handle includes
 					const includeRegex = /include:([\w.-]+)/g;
@@ -41,12 +49,8 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 					while ((match = includeRegex.exec(spfRecord)) !== null) {
 						const includedDomain = match[1];
 						console.log(`Found include mechanism for domain: ${includedDomain}`);
-						const includedSpf = await getSpfRecord(includedDomain, visitedDomains);
-						if (includedSpf) {
-							return includedSpf;
-						} else {
-							return null; // If an included domain has no SPF, the resolution fails.
-						}
+						const includedSpfRecords = await getSpfRecord(includedDomain, visitedDomains);
+						spfRecords.push(...includedSpfRecords);
 					}
 
 					// Handle redirects
@@ -55,18 +59,13 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 					if (match) {
 						const redirectedDomain = match[1];
 						console.log(`Found redirect mechanism for domain: ${redirectedDomain}`);
-						const redirectedSpf = await getSpfRecord(redirectedDomain, visitedDomains);
-						if (redirectedSpf) {
-							return redirectedSpf;
-						} else {
-							return null; // If a redirected domain has no SPF, the resolution fails.
-						}
+						const redirectedSpfRecords = await getSpfRecord(redirectedDomain, visitedDomains);
+						spfRecords.push(...redirectedSpfRecords);
 					}
-					return spfRecord;
 				}
 			}
 		}
-		return null;
+		return spfRecords;
 	} catch (error) {
 		console.error("DoH TXT request failed:", error);
 		throw new Error("DNS TXT query failed");

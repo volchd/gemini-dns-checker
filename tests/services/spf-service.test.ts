@@ -22,15 +22,18 @@ describe("getSpfRecord", () => {
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=spf1 include:_spf.google.com ~all" }]))
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=spf1 ip4:1.2.3.4 ~all" }])); // Mock for _spf.google.com
 
-		const spfRecord = await getSpfRecord("example.com");
-		expect(spfRecord).toBe("v=spf1 ip4:1.2.3.4 ~all");
+		const spfRecords = await getSpfRecord("example.com");
+		expect(spfRecords).toEqual([
+			{ domain: "example.com", spfRecord: "v=spf1 include:_spf.google.com ~all" },
+			{ domain: "_spf.google.com", spfRecord: "v=spf1 ip4:1.2.3.4 ~all" },
+		]);
 	});
 
-	it("should return null if no SPF record is found", async () => {
+	it("should return an empty array if no SPF record is found", async () => {
 		(global.fetch as jest.Mock).mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=DKIM1 p=somekey" }]));
 
-		const spfRecord = await getSpfRecord("example.com");
-		expect(spfRecord).toBeNull();
+		const spfRecords = await getSpfRecord("example.com");
+		expect(spfRecords).toEqual([]);
 	});
 
 	it("should handle included SPF records recursively", async () => {
@@ -39,8 +42,11 @@ describe("getSpfRecord", () => {
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=spf1 include:sub.example.com ~all" }]))
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=spf1 ip4:192.0.2.1 -all" }]));
 
-		const spfRecord = await getSpfRecord("example.com");
-		expect(spfRecord).toBe("v=spf1 ip4:192.0.2.1 -all");
+		const spfRecords = await getSpfRecord("example.com");
+		expect(spfRecords).toEqual([
+			{ domain: "example.com", spfRecord: "v=spf1 include:sub.example.com ~all" },
+			{ domain: "sub.example.com", spfRecord: "v=spf1 ip4:192.0.2.1 -all" },
+		]);
 	});
 
 	it("should handle redirected SPF records recursively", async () => {
@@ -49,28 +55,31 @@ describe("getSpfRecord", () => {
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=spf1 redirect=redirect.example.com" }]))
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=spf1 ip4:192.0.2.2 +all" }]));
 
-		const spfRecord = await getSpfRecord("example.com");
-		expect(spfRecord).toBe("v=spf1 ip4:192.0.2.2 +all");
+		const spfRecords = await getSpfRecord("example.com");
+		expect(spfRecords).toEqual([
+			{ domain: "example.com", spfRecord: "v=spf1 redirect=redirect.example.com" },
+			{ domain: "redirect.example.com", spfRecord: "v=spf1 ip4:192.0.2.2 +all" },
+		]);
 	});
 
-	it("should return null if included domain has no SPF record", async () => {
+	it("should return an empty array if included domain has no SPF record", async () => {
 		// First call for example.com
 		(global.fetch as jest.Mock)
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=spf1 include:no-spf.example.com ~all" }]))
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [])); // No SPF record
 
-		const spfRecord = await getSpfRecord("example.com");
-		expect(spfRecord).toBeNull();
+		const spfRecords = await getSpfRecord("example.com");
+		expect(spfRecords).toEqual([{ domain: "example.com", spfRecord: "v=spf1 include:no-spf.example.com ~all" }]);
 	});
 
-	it("should return null if redirected domain has no SPF record", async () => {
+	it("should return an array with the original SPF record if redirected domain has no SPF record", async () => {
 		// First call for example.com
 		(global.fetch as jest.Mock)
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [{ type: 16, data: "v=spf1 redirect=no-spf.example.com" }]))
 			.mockResolvedValueOnce(mockFetchResponse(true, 0, [])); // No SPF record
 
-		const spfRecord = await getSpfRecord("example.com");
-		expect(spfRecord).toBeNull();
+		const spfRecords = await getSpfRecord("example.com");
+		expect(spfRecords).toEqual([{ domain: "example.com", spfRecord: "v=spf1 redirect=no-spf.example.com" }]);
 	});
 
 	it("should throw an error if the DoH query for TXT records fails", async () => {

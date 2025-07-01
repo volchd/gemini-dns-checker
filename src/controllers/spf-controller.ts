@@ -11,7 +11,7 @@ export async function handleSpfRequest(c: Context): Promise<Response> {
 
 	try {
 		const spfRecord = await getSpfRecord(domain);
-		return new Response(JSON.stringify({ domain, spfRecord }), { headers: { 'Content-Type': 'application/json' } });
+		return c.json({ domain, spfRecords: spfRecord });
 	} catch (error) {
 		console.error('Error handling SPF request:', error);
 		return new Response('Error retrieving SPF record', { status: 500 });
