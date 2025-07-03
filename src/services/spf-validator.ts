@@ -4,6 +4,72 @@ export interface SpfRecordObject {
 	type: 'initial' | 'include' | 'redirect';
 }
 
+class SyntaxValidator {
+    validate(record: string): { isValid: boolean; errors: string[] } {
+        const errors: string[] = [];
+        const terms = record.split(' ').filter(term => term.length > 0);
+
+        if (terms.length === 0 || terms[0].toLowerCase() !== 'v=spf1') {
+            errors.push('Record must start with "v=spf1"');
+            return { isValid: false, errors };
+        }
+
+        const mechanisms = terms.slice(1);
+        if (mechanisms.length === 0) {
+            errors.push('Record must contain at least one mechanism or modifier');
+            return { isValid: false, errors };
+        }
+
+        const lastTerm = mechanisms[mechanisms.length - 1];
+        if (!lastTerm.includes('all') && !lastTerm.startsWith('redirect=')) {
+            errors.push('Record must end with an "all" mechanism or a "redirect" modifier');
+        }
+
+        for (const term of mechanisms) {
+            this.validateTerm(term, errors);
+        }
+
+        return { isValid: errors.length === 0, errors };
+    }
+
+    private validateTerm(term: string, errors: string[]): void {
+        const qualifier = ['+', '-', '~', '?'].find(q => term.startsWith(q));
+        const mechanism = qualifier ? term.substring(1) : term;
+
+        const [name, value] = mechanism.split(/:(.*)/s);
+
+        const knownMechanisms = ['a', 'mx', 'ip4', 'ip6', 'include', 'exists', 'all'];
+        const knownModifiers = ['redirect', 'exp'];
+
+        if (knownMechanisms.includes(name)) {
+            this.validateMechanism(name, value, errors);
+        } else if (knownModifiers.includes(name)) {
+            this.validateModifier(name, value, errors);
+        } else {
+            errors.push(`Unknown mechanism or modifier: ${name}`);
+        }
+    }
+
+    private validateMechanism(name: string, value: string | undefined, errors: string[]): void {
+        if (['a', 'mx', 'include', 'exists'].includes(name) && !value) {
+            errors.push(`Mechanism "${name}" requires a value`);
+        }
+        if (name === 'ip4' && value && !/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(value)) {
+            errors.push(`Invalid IPv4 address for "ip4": ${value}`);
+        }
+        if (name === 'ip6' && value && !/^[0-9a-fA-F:.]*$/.test(value)) {
+            errors.push(`Invalid IPv6 address for "ip6": ${value}`);
+        }
+    }
+
+    private validateModifier(name: string, value: string | undefined, errors: string[]): void {
+        if (!value) {
+            errors.push(`Modifier "${name}" requires a value`);
+        }
+    }
+}
+
+
 export class SpfValidator {
 	/**
 	 * Checks if any SPF record is present.
@@ -22,26 +88,13 @@ export class SpfValidator {
 	 */
 	validateSpfSyntax(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
 		const errors: { record: SpfRecordObject; error: string }[] = [];
-		// Basic regex for SPF record validation. This is a simplified check.
-		// A more robust validator would parse mechanisms and modifiers.
-		const spfSyntaxRegex = /^v=spf1\s+([a-z0-9.:\-_/~+= ]+)?(all|~all|-all|\+all)$/;
+        const syntaxValidator = new SyntaxValidator();
 
 		for (const record of spfRecords) {
-			const trimmedRecord = record.spfRecord.trim();
-			if (spfSyntaxRegex.test(trimmedRecord)) {
-				continue;
-			}
-
-			if (!trimmedRecord.startsWith('v=spf1')) {
-				errors.push({ record, error: 'Invalid SPF record syntax: must start with "v=spf1"' });
-			} else if (/[~+-]?all"$/.test(trimmedRecord)) {
-				errors.push({ record, error: 'Invalid SPF record syntax: trailing characters after the \'all\' mechanism' });
-			} else if (!/(all|~all|-all|\+all)$/.test(trimmedRecord)) {
-				errors.push({ record, error: 'Invalid SPF record syntax: must end with a valid \'all\' mechanism' });
-			} else {
-				// Fallback for other syntax errors not caught by specific checks
-				errors.push({ record, error: `Invalid SPF record syntax: ${record.spfRecord}` });
-			}
+			const validationResult = syntaxValidator.validate(record.spfRecord);
+            if (!validationResult.isValid) {
+                errors.push({ record, error: validationResult.errors.join(', ') });
+            }
 		}
 		return errors;
 	}
