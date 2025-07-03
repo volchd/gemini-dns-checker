@@ -129,6 +129,11 @@ export class SpfValidator {
             firstAllQualifier: { qualifier: null }
         };
 
+        // Concatenate split SPF records before validation
+        spfRecords.forEach(record => {
+            record.spfRecord = this.concatenateSpfRecordString(record.spfRecord);
+        });
+
         // 1. Check if any SPF record exists.
         const hasRecord = this.hasSpfRecord(spfRecords);
         results.hasSpfRecord.isValid = hasRecord;
@@ -301,4 +306,20 @@ export class SpfValidator {
 		}
 		return null;
 	}
+
+    /**
+     * Concatenates a split SPF record string into a single string.
+     * @param splitRecordString The SPF record string that might be split into multiple quoted segments.
+     * @returns The concatenated SPF record string.
+     */
+    private concatenateSpfRecordString(splitRecordString: string): string {
+        const regex = /"([^"]*)"/g;
+        let match;
+        const segments: string[] = [];
+
+        while ((match = regex.exec(splitRecordString)) !== null) {
+            segments.push(match[1]);
+        }
+        return segments.join('');
+    }
 }
