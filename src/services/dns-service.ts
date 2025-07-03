@@ -1,16 +1,12 @@
-interface DnsResponse {
-	Status: number;
-	Answer?: { name: string; type: number; TTL: number; data: string }[];
-}
+import { DnsResponse } from "../types";
+import { dohUrl } from "../config";
 
 export async function checkDnsRegistration(domain: string) {
 	console.log(`Performing DoH lookup for domain: ${domain}`);
-	const dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(
-		domain
-	)}`;
+	const url = `${dohUrl}?name=${encodeURIComponent(domain)}`;
 
 	try {
-		const response = await fetch(dohUrl, {
+		const response = await fetch(url, {
 			headers: {
 				Accept: "application/dns-json",
 			},

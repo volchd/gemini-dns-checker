@@ -1,4 +1,5 @@
 import { getSpfRecord } from '../services/spf-service';
+import { SpfValidator } from '../services/spf-validator';
 import { Context } from 'hono';
 
 export async function handleSpfRequest(c: Context): Promise<Response> {
@@ -6,14 +7,16 @@ export async function handleSpfRequest(c: Context): Promise<Response> {
 	const domain = c.req.query('domain');
 
 	if (!domain) {
-		return new Response('Missing domain parameter', { status: 400 });
+		return c.json({ error: 'Missing domain parameter' }, 400);
 	}
 
 	try {
-		const spfRecord = await getSpfRecord(domain);
-		return c.json({ domain, spfRecords: spfRecord });
+		const spfRecords = await getSpfRecord(domain);
+		const spfValidator = new SpfValidator();
+		const validationResults = spfValidator.validate(spfRecords);
+		return c.json({ domain, spfRecords, validationResults });
 	} catch (error) {
 		console.error('Error handling SPF request:', error);
-		return new Response('Error retrieving SPF record', { status: 500 });
+		return c.json({ error: 'Error retrieving SPF record' }, 500);
 	}
 }

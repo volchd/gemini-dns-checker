@@ -1,8 +1,4 @@
-export interface SpfRecordObject {
-	domain: string;
-	spfRecord: string;
-	type: 'initial' | 'include' | 'redirect';
-}
+import { SpfRecordObject } from "../types";
 
 class SyntaxValidator {
     validate(record: string): { isValid: boolean; errors: string[] } {
@@ -11,18 +7,18 @@ class SyntaxValidator {
 
         if (terms.length === 0 || terms[0].toLowerCase() !== 'v=spf1') {
             errors.push('Record must start with "v=spf1"');
-            return { isValid: false, errors };
+        }
+
+        if (terms.length > 1) {
+            const lastTerm = terms[terms.length - 1];
+            if (!lastTerm.includes('all') && !lastTerm.startsWith('redirect=')) {
+                errors.push('Record must end with an "all" mechanism or a "redirect" modifier');
+            }
         }
 
         const mechanisms = terms.slice(1);
         if (mechanisms.length === 0) {
             errors.push('Record must contain at least one mechanism or modifier');
-            return { isValid: false, errors };
-        }
-
-        const lastTerm = mechanisms[mechanisms.length - 1];
-        if (!lastTerm.includes('all') && !lastTerm.startsWith('redirect=')) {
-            errors.push('Record must end with an "all" mechanism or a "redirect" modifier');
         }
 
         for (const term of mechanisms) {
@@ -69,29 +65,41 @@ class SyntaxValidator {
     }
 }
 
-
 export class SpfValidator {
-	/**
-	 * Checks if any SPF record is present.
-	 * @param spfRecords - An array of SpfRecordObject.
-	 * @returns True if at least one SPF record is present, false otherwise.
-	 */
+    private syntaxValidator = new SyntaxValidator();
+
+    validate(spfRecords: SpfRecordObject[]): any[] {
+        const results: any[] = [];
+
+        if (!this.hasSpfRecord(spfRecords)) {
+            results.push({ message: "No SPF record found." });
+            return results;
+        }
+
+        results.push(...this.validateSpfSyntax(spfRecords));
+
+        if (!this.hasOneInitialSpfRecord(spfRecords)) {
+            results.push({ message: "There should be exactly one initial SPF record." });
+        }
+
+        if (!this.hasMaxTenSpfRecords(spfRecords)) {
+            results.push({ message: "The number of SPF record lookups should not exceed 10." });
+        }
+
+        results.push(...this.checkDeprecatedMechanisms(spfRecords));
+        results.push(...this.isPassAll(spfRecords));
+
+        return results;
+    }
+
 	hasSpfRecord(spfRecords: SpfRecordObject[]): boolean {
 		return spfRecords.length > 0;
 	}
 
-	/**
-	 * Validates the syntax of all SPF records.
-	 * A basic regex is used for validation.
-	 * @param spfRecords - An array of SpfRecordObject.
-	 * @returns An array of objects, each containing the record and an error message if syntax is invalid.
-	 */
 	validateSpfSyntax(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
 		const errors: { record: SpfRecordObject; error: string }[] = [];
-        const syntaxValidator = new SyntaxValidator();
-
 		for (const record of spfRecords) {
-			const validationResult = syntaxValidator.validate(record.spfRecord);
+			const validationResult = this.syntaxValidator.validate(record.spfRecord);
             if (!validationResult.isValid) {
                 errors.push({ record, error: validationResult.errors.join(', ') });
             }
@@ -99,32 +107,16 @@ export class SpfValidator {
 		return errors;
 	}
 
-	/**
-	 * Validates that there is exactly one "initial" SPF record.
-	 * @param spfRecords - An array of SpfRecordObject.
-	 * @returns True if exactly one initial SPF record is found, false otherwise.
-	 */
 	hasOneInitialSpfRecord(spfRecords: SpfRecordObject[]): boolean {
 		const initialRecords = spfRecords.filter(record => record.type === 'initial');
 		return initialRecords.length === 1;
 	}
 
-	/**
-	 * Validates that the total number of SPF records (excluding "initial") is less than or equal to 10.
-	 * This refers to the 10-lookup limit in SPF.
-	 * @param spfRecords - An array of SpfRecordObject.
-	 * @returns True if the number of non-initial SPF records is 10 or less, false otherwise.
-	 */
 	hasMaxTenSpfRecords(spfRecords: SpfRecordObject[]): boolean {
 		const nonInitialRecords = spfRecords.filter(record => record.type !== 'initial');
 		return nonInitialRecords.length <= 10;
 	}
 
-	/**
-	 * Checks for deprecated mechanisms in SPF records, such as "ptr".
-	 * @param spfRecords - An array of SpfRecordObject.
-	 * @returns An array of objects, each containing the record and an error message if a deprecated mechanism is found.
-	 */
 	checkDeprecatedMechanisms(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
 		const errors: { record: SpfRecordObject; error: string }[] = [];
 		const deprecatedMechanisms = ['ptr'];
@@ -148,11 +140,6 @@ export class SpfValidator {
 		return errors;
 	}
 
-	/**
-	 * Checks if any SPF record contains a "+all" or "all" mechanism.
-	 * @param spfRecords - An array of SpfRecordObject.
-	 * @returns An array of objects, each containing the record and an error message if a "+all" or "all" mechanism is found.
-	 */
 	isPassAll(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
 		const errors: { record: SpfRecordObject; error: string }[] = [];
 		for (const record of spfRecords) {
@@ -166,12 +153,6 @@ export class SpfValidator {
 		return errors;
 	}
 
-	/**
-	 * Gets the qualifier of the first 'all' mechanism found in a series of SPF records.
-	 * It checks the initial record first, then any subsequent redirect records.
-	 * @param spfRecords - An array of SpfRecordObject, assumed to be in evaluation order.
-	 * @returns The qualifier ('+', '-', '~', '?') of the first 'all' mechanism found, or null.
-	 */
 	getFirstAllQualifier(spfRecords: SpfRecordObject[]): string | null {
 		for (const record of spfRecords) {
 			if (record.type === 'initial' || record.type === 'redirect') {

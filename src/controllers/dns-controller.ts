@@ -1,7 +1,7 @@
 import { Context } from "hono";
 import { checkDnsRegistration } from "../services/dns-service";
 
-export async function checkDns(c: Context) {
+export async function checkDns(c: Context): Promise<Response> {
 	const domain = c.req.query("domain");
 
 	if (!domain) {

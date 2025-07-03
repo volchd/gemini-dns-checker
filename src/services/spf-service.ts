@@ -1,13 +1,5 @@
-interface DnsResponse {
-	Status: number;
-	Answer?: { name: string; type: number; TTL: number; data: string }[];
-}
-
-interface SpfRecordObject {
-	domain: string;
-	spfRecord: string;
-	type: 'initial' | 'include' | 'redirect';
-}
+import { DnsResponse, SpfRecordObject } from "../types";
+import { dohUrl } from "../config";
 
 export async function getSpfRecord(domain: string, visitedDomains: Set<string> = new Set(), recordType: 'initial' | 'include' | 'redirect' = 'initial'): Promise<SpfRecordObject[]> {
 	if (visitedDomains.has(domain)) {
@@ -17,12 +9,10 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 	visitedDomains.add(domain);
 
 	console.log(`Performing SPF record lookup for domain: ${domain}`);
-	const dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(
-		domain
-	)}&type=TXT`;
+	const url = `${dohUrl}?name=${encodeURIComponent(domain)}&type=TXT`;
 
 	try {
-		const response = await fetch(dohUrl, {
+		const response = await fetch(url, {
 			headers: {
 				Accept: "application/dns-json",
 			},
