@@ -37,10 +37,10 @@ describe('SpfValidator', () => {
 			];
 			const errors = validator.validateSpfSyntax(spfRecords);
 			expect(errors.length).toBe(4);
-			expect(errors[0].error).toContain('Invalid SPF record syntax');
-			expect(errors[1].error).toContain('Invalid SPF record syntax');
-			expect(errors[2].error).toContain('Invalid SPF record syntax');
-			expect(errors[3].error).toContain('Invalid SPF record syntax');
+			expect(errors[0].error).toBe('Record must start with "v=spf1"');
+			expect(errors[1].error).toBe('Unknown mechanism or modifier: allx');
+			expect(errors[2].error).toBe('Record must end with an "all" mechanism or a "redirect" modifier');
+			expect(errors[3].error).toBe('Unknown mechanism or modifier: all"');
 		});
 	});
 
@@ -124,7 +124,45 @@ describe('SpfValidator', () => {
 			const spfRecords: SpfRecordObject[] = [
 				{ domain: 'example.com', spfRecord: 'v=spf1 a:optr.example.com -all', type: 'initial' as const },
 			];
-			expect(validator.checkDeprecatedMechanisms(spfRecords)).toEqual([]);
+							expect(validator.checkDeprecatedMechanisms(spfRecords)).toEqual([]);
+		});
+	});
+
+	describe('isPassAll', () => {
+		it('should return an empty array for SPF records without "+all" or "all"', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 -all', type: 'initial' as const },
+				{ domain: 'example.com', spfRecord: 'v=spf1 ~all', type: 'initial' as const },
+			];
+			expect(validator.isPassAll(spfRecords)).toEqual([]);
+		});
+
+		it('should return errors for SPF records with "+all" or "all"', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 +all', type: 'initial' as const },
+				{ domain: 'example.com', spfRecord: 'v=spf1 all', type: 'initial' as const },
+			];
+			const errors = validator.isPassAll(spfRecords);
+			expect(errors.length).toBe(2);
+			expect(errors[0].error).toBe('Unsafe "+all" or "all" mechanism found');
+			expect(errors[1].error).toBe('Unsafe "+all" or "all" mechanism found');
+		});
+
+		it('should correctly identify "all" or "+all" regardless of case', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 ALL', type: 'initial' as const },
+				{ domain: 'example.com', spfRecord: 'v=spf1 +ALL', type: 'initial' as const },
+			];
+			const errors = validator.isPassAll(spfRecords);
+			expect(errors.length).toBe(2);
+		});
+
+		it('should not flag "-all" or "~all"', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 -all', type: 'initial' as const },
+				{ domain: 'example.com', spfRecord: 'v=spf1 ~all', type: 'initial' as const },
+			];
+			expect(validator.isPassAll(spfRecords)).toEqual([]);
 		});
 	});
 });

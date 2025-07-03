@@ -147,4 +147,22 @@ export class SpfValidator {
 		}
 		return errors;
 	}
+
+	/**
+	 * Checks if any SPF record contains a "+all" or "all" mechanism.
+	 * @param spfRecords - An array of SpfRecordObject.
+	 * @returns An array of objects, each containing the record and an error message if a "+all" or "all" mechanism is found.
+	 */
+	isPassAll(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
+		const errors: { record: SpfRecordObject; error: string }[] = [];
+		for (const record of spfRecords) {
+			const terms = record.spfRecord.toLowerCase().split(' ').filter(term => term.length > 0);
+			const lastTerm = terms[terms.length - 1];
+
+			if (lastTerm === 'all' || lastTerm === '+all') {
+				errors.push({ record, error: 'Unsafe "+all" or "all" mechanism found' });
+			}
+		}
+		return errors;
+	}
 }
