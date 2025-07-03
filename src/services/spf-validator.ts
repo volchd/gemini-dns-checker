@@ -120,12 +120,12 @@ export class SpfValidator {
      */
     validate(spfRecords: SpfRecordObject[]): SpfValidationResults {
         const results: SpfValidationResults = {
-            hasSpfRecord: { isValid: true },
-            syntaxValidation: { isValid: true, errors: [] },
-            oneInitialSpfRecord: { isValid: true },
-            maxTenSpfRecords: { isValid: true },
-            deprecatedMechanisms: { isValid: true, errors: [] },
-            unsafeAllMechanism: { isValid: true, errors: [] },
+            hasSpfRecord: { isValid: false },
+            syntaxValidation: { isValid: false, errors: [] },
+            oneInitialSpfRecord: { isValid: false },
+            maxTenSpfRecords: { isValid: false },
+            deprecatedMechanisms: { isValid: false, errors: [] },
+            unsafeAllMechanism: { isValid: false, errors: [] },
             firstAllQualifier: { qualifier: null }
         };
 
