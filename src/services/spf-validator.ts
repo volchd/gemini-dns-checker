@@ -1,4 +1,5 @@
 import { SpfRecordObject, SpfValidationResults } from "../types";
+import ipaddr from 'ipaddr.js';
 
 /**
  * Validates the syntax of a single SPF record string.
@@ -54,12 +55,19 @@ class SyntaxValidator {
         // Extract the mechanism/modifier name by removing the qualifier if present.
         const mechanism = qualifier ? term.substring(1) : term;
 
-        // Split the mechanism into name and value (e.g., "include:example.com" -> "include", "example.com").
-        const [name, value] = mechanism.split(/:(.*)/s);
-
         // Define known SPF mechanisms and modifiers.
-        const knownMechanisms = ['a', 'mx', 'ip4', 'ip6', 'include', 'exists', 'all'];
+        const knownMechanisms = ['a', 'mx', 'ip4', 'ip6', 'ptr', 'include', 'exists', 'all'];
         const knownModifiers = ['redirect', 'exp'];
+
+        // Split the mechanism into name and value.
+        let name: string, value: string | undefined;
+        if (knownModifiers.some(mod => mechanism.startsWith(mod + '='))) {
+            // For modifiers, use '=' as separator.
+            [name, value] = mechanism.split(/=(.*)/s);
+        } else {
+            // For mechanisms, use ':' as separator.
+            [name, value] = mechanism.split(/:(.*)/s);
+        }
 
         // Validate based on whether it's a known mechanism or modifier.
         if (knownMechanisms.includes(name)) {
@@ -88,9 +96,36 @@ class SyntaxValidator {
             errors.push(`Invalid IPv4 address for "ip4": ${value}`);
         }
         // Validate IPv6 address format for "ip6" mechanism.
-        if (name === 'ip6' && value && !/^[0-9a-fA-F:.]*$/.test(value)) {
+        if (name === 'ip6' && value && !this.isValidateIp6(value)) {
             errors.push(`Invalid IPv6 address for "ip6": ${value}`);
         }
+    }
+
+    /**
+     * Validate an SPF ip6 mechanism.
+     * @param value  The literal after "ip6:", e.g. "2800:3f0:4000::/36"
+     * @returns      true  → syntactically valid
+     *               false → invalid (an explanatory message is logged)
+     */
+    private isValidateIp6(value: string): boolean {
+        const [addr, cidr] = value.split("/");
+
+        /* 1 — basic IPv6 syntax */
+        if (!ipaddr.isValid(addr) || ipaddr.parse(addr).kind() !== "ipv6") {
+            console.error(`Invalid IPv6 address: ${addr}`);
+            return false;
+        }
+
+        /* 2 — optional CIDR prefix 0-128 */
+        if (cidr !== undefined) {
+            const n = Number(cidr);
+            if (!Number.isInteger(n) || n < 0 || n > 128) {
+                console.error(`CIDR length must be 0–128 (got ${cidr})`);
+                return false;
+            }
+        }
+
+        return true;          // everything checks out
     }
 
     /**
@@ -133,6 +168,8 @@ export class SpfValidator {
         spfRecords.forEach(record => {
             record.spfRecord = this.concatenateSpfRecordString(record.spfRecord);
         });
+
+        console.log("Concatenated SPF records:", spfRecords.map(r => r.spfRecord));
 
         // 1. Check if any SPF record exists.
         const hasRecord = this.hasSpfRecord(spfRecords);
@@ -187,125 +224,126 @@ export class SpfValidator {
      * @param spfRecords An array of SpfRecordObject.
      * @returns True if at least one SPF record exists, false otherwise.
      */
-	hasSpfRecord(spfRecords: SpfRecordObject[]): boolean {
-		return spfRecords.length > 0;
-	}
+    hasSpfRecord(spfRecords: SpfRecordObject[]): boolean {
+        return spfRecords.length > 0;
+    }
 
     /**
      * Validates the syntax of each SPF record using the SyntaxValidator.
      * @param spfRecords An array of SpfRecordObject.
      * @returns An array of errors found during syntax validation.
      */
-	validateSpfSyntax(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
-		const errors: { record: SpfRecordObject; error: string }[] = [];
-		for (const record of spfRecords) {
-			const validationResult = this.syntaxValidator.validate(record.spfRecord);
+    validateSpfSyntax(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
+
+        const errors: { record: SpfRecordObject; error: string }[] = [];
+        for (const record of spfRecords) {
+            const validationResult = this.syntaxValidator.validate(record.spfRecord);
             if (!validationResult.isValid) {
                 errors.push({ record, error: validationResult.errors.join(', ') });
             }
-		}
-		return errors;
-	}
+        }
+        return errors;
+    }
 
     /**
      * Checks if there is exactly one initial SPF record.
      * @param spfRecords An array of SpfRecordObject.
      * @returns True if there is exactly one initial SPF record, false otherwise.
      */
-	hasOneInitialSpfRecord(spfRecords: SpfRecordObject[]): boolean {
-		const initialRecords = spfRecords.filter(record => record.type === 'initial');
-		return initialRecords.length === 1;
-	}
+    hasOneInitialSpfRecord(spfRecords: SpfRecordObject[]): boolean {
+        const initialRecords = spfRecords.filter(record => record.type === 'initial');
+        return initialRecords.length === 1;
+    }
 
     /**
      * Checks if the number of SPF record lookups (non-initial records) does not exceed 10.
      * @param spfRecords An array of SpfRecordObject.
      * @returns True if the number of non-initial SPF records is 10 or less, false otherwise.
      */
-	hasMaxTenSpfRecords(spfRecords: SpfRecordObject[]): boolean {
-		const nonInitialRecords = spfRecords.filter(record => record.type !== 'initial');
-		return nonInitialRecords.length <= 10;
-	}
+    hasMaxTenSpfRecords(spfRecords: SpfRecordObject[]): boolean {
+        const nonInitialRecords = spfRecords.filter(record => record.type !== 'initial');
+        return nonInitialRecords.length <= 10;
+    }
 
     /**
      * Checks for the presence of deprecated SPF mechanisms (e.g., "ptr").
      * @param spfRecords An array of SpfRecordObject.
      * @returns An array of errors if deprecated mechanisms are found.
      */
-	checkDeprecatedMechanisms(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
-		const errors: { record: SpfRecordObject; error: string }[] = [];
-		const deprecatedMechanisms = ['ptr'];
+    checkDeprecatedMechanisms(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
+        const errors: { record: SpfRecordObject; error: string }[] = [];
+        const deprecatedMechanisms = ['ptr'];
 
-		for (const record of spfRecords) {
-			const parts = record.spfRecord.split(' ');
-			for (const part of parts) {
-				let mechanism = part;
-				// Remove qualifier if present.
-				if (['+', '-', '~', '?'].includes(mechanism.charAt(0))) {
-					mechanism = mechanism.substring(1);
-				}
+        for (const record of spfRecords) {
+            const parts = record.spfRecord.split(' ');
+            for (const part of parts) {
+                let mechanism = part;
+                // Remove qualifier if present.
+                if (['+', '-', '~', '?'].includes(mechanism.charAt(0))) {
+                    mechanism = mechanism.substring(1);
+                }
 
-				// Check against deprecated mechanisms.
-				for (const deprecated of deprecatedMechanisms) {
-					if (mechanism === deprecated || mechanism.startsWith(deprecated + ':')) {
-						errors.push({ record, error: `Deprecated mechanism found: "${deprecated}"` });
-						break;
-					}
-				}
-			}
-		}
-		return errors;
-	}
+                // Check against deprecated mechanisms.
+                for (const deprecated of deprecatedMechanisms) {
+                    if (mechanism === deprecated || mechanism.startsWith(deprecated + ':')) {
+                        errors.push({ record, error: `Deprecated mechanism found: "${deprecated}"` });
+                        break;
+                    }
+                }
+            }
+        }
+        return errors;
+    }
 
     /**
      * Checks if any SPF record uses the unsafe "+all" or "all" mechanism.
      * @param spfRecords An array of SpfRecordObject.
      * @returns An array of errors if unsafe "all" mechanisms are found.
      */
-	isPassAll(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
-		const errors: { record: SpfRecordObject; error: string }[] = [];
-		for (const record of spfRecords) {
-			// Convert to lowercase and split into terms.
-			const terms = record.spfRecord.toLowerCase().split(' ').filter(term => term.length > 0);
-			const lastTerm = terms[terms.length - 1];
+    isPassAll(spfRecords: SpfRecordObject[]): { record: SpfRecordObject; error: string }[] {
+        const errors: { record: SpfRecordObject; error: string }[] = [];
+        for (const record of spfRecords) {
+            // Convert to lowercase and split into terms.
+            const terms = record.spfRecord.toLowerCase().split(' ').filter(term => term.length > 0);
+            const lastTerm = terms[terms.length - 1];
 
-			// If the last term is "all" or "+all", it's considered unsafe.
-			if (lastTerm === 'all' || lastTerm === '+all') {
-				errors.push({ record, error: 'Unsafe "+all" or "all" mechanism found' });
-			}
-		}
-		return errors;
-	}
+            // If the last term is "all" or "+all", it's considered unsafe.
+            if (lastTerm === 'all' || lastTerm === '+all') {
+                errors.push({ record, error: 'Unsafe "+all" or "all" mechanism found' });
+            }
+        }
+        return errors;
+    }
 
     /**
      * Retrieves the qualifier of the first "all" mechanism found in the initial or redirected SPF records.
      * @param spfRecords An array of SpfRecordObject.
      * @returns The qualifier (e.g., "+", "-", "~", "?") or null if not found.
      */
-	getFirstAllQualifier(spfRecords: SpfRecordObject[]): string | null {
-		for (const record of spfRecords) {
-			// Only consider initial or redirect records.
-			if (record.type === 'initial' || record.type === 'redirect') {
-				// Convert to lowercase and split into terms.
-				const terms = record.spfRecord.toLowerCase().split(' ').filter(term => term.length > 0);
-				// Find the term ending with "all".
-				const allTerm = terms.find(term => term.endsWith('all'));
+    getFirstAllQualifier(spfRecords: SpfRecordObject[]): string | null {
+        for (const record of spfRecords) {
+            // Only consider initial or redirect records.
+            if (record.type === 'initial' || record.type === 'redirect') {
+                // Convert to lowercase and split into terms.
+                const terms = record.spfRecord.toLowerCase().split(' ').filter(term => term.length > 0);
+                // Find the term ending with "all".
+                const allTerm = terms.find(term => term.endsWith('all'));
 
-				if (allTerm) {
-					// If it's just "all", default qualifier is "+".
-					if (allTerm === 'all') {
-						return '+'; // Default qualifier
-					}
-					// Extract and return the qualifier if it's one of the known qualifiers.
-					const qualifier = allTerm.charAt(0);
-					if (['+', '-', '~', '?'].includes(qualifier)) {
-						return qualifier;
-					}
-				}
-			}
-		}
-		return null;
-	}
+                if (allTerm) {
+                    // If it's just "all", default qualifier is "+".
+                    if (allTerm === 'all') {
+                        return '+'; // Default qualifier
+                    }
+                    // Extract and return the qualifier if it's one of the known qualifiers.
+                    const qualifier = allTerm.charAt(0);
+                    if (['+', '-', '~', '?'].includes(qualifier)) {
+                        return qualifier;
+                    }
+                }
+            }
+        }
+        return null;
+    }
 
     /**
      * Concatenates a split SPF record string into a single string.
