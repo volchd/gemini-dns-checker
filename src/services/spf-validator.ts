@@ -88,7 +88,7 @@ class SyntaxValidator {
      */
     private validateMechanism(name: string, value: string | undefined, errors: string[]): void {
         // Check if mechanisms requiring a value have one.
-        if (['a', 'mx', 'include', 'exists'].includes(name) && !value) {
+        if (['include', 'exists'].includes(name) && !value) {
             errors.push(`Mechanism "${name}" requires a value`);
         }
         // Validate IPv4 address format for "ip4" mechanism.
