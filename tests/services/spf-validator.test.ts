@@ -165,4 +165,44 @@ describe('SpfValidator', () => {
 			expect(validator.isPassAll(spfRecords)).toEqual([]);
 		});
 	});
+
+	describe('getFirstAllQualifier', () => {
+		it('should return the qualifier of the first "all" mechanism in the initial record', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 include:_spf.google.com ~all', type: 'initial' as const },
+				{ domain: '_spf.google.com', spfRecord: 'v=spf1 ip4:1.2.3.4 -all', type: 'include' as const },
+			];
+			expect(validator.getFirstAllQualifier(spfRecords)).toBe('~');
+		});
+
+		it('should return the qualifier of the first "all" mechanism in a redirect record', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 redirect=_spf.google.com', type: 'initial' as const },
+				{ domain: '_spf.google.com', spfRecord: 'v=spf1 ip4:1.2.3.4 -all', type: 'redirect' as const },
+			];
+			expect(validator.getFirstAllQualifier(spfRecords)).toBe('-');
+		});
+
+		it('should return "+" for an implicit qualifier', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 all', type: 'initial' as const },
+			];
+			expect(validator.getFirstAllQualifier(spfRecords)).toBe('+');
+		});
+
+		it('should return null if no "all" mechanism is found', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 include:_spf.google.com', type: 'initial' as const },
+			];
+			expect(validator.getFirstAllQualifier(spfRecords)).toBeNull();
+		});
+
+		it('should ignore "all" in include records', () => {
+			const spfRecords: SpfRecordObject[] = [
+				{ domain: 'example.com', spfRecord: 'v=spf1 include:_spf.google.com', type: 'initial' as const },
+				{ domain: '_spf.google.com', spfRecord: 'v=spf1 -all', type: 'include' as const },
+			];
+			expect(validator.getFirstAllQualifier(spfRecords)).toBeNull();
+		});
+	});
 });

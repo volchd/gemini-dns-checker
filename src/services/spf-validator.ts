@@ -165,4 +165,30 @@ export class SpfValidator {
 		}
 		return errors;
 	}
+
+	/**
+	 * Gets the qualifier of the first 'all' mechanism found in a series of SPF records.
+	 * It checks the initial record first, then any subsequent redirect records.
+	 * @param spfRecords - An array of SpfRecordObject, assumed to be in evaluation order.
+	 * @returns The qualifier ('+', '-', '~', '?') of the first 'all' mechanism found, or null.
+	 */
+	getFirstAllQualifier(spfRecords: SpfRecordObject[]): string | null {
+		for (const record of spfRecords) {
+			if (record.type === 'initial' || record.type === 'redirect') {
+				const terms = record.spfRecord.toLowerCase().split(' ').filter(term => term.length > 0);
+				const allTerm = terms.find(term => term.endsWith('all'));
+
+				if (allTerm) {
+					if (allTerm === 'all') {
+						return '+'; // Default qualifier
+					}
+					const qualifier = allTerm.charAt(0);
+					if (['+', '-', '~', '?'].includes(qualifier)) {
+						return qualifier;
+					}
+				}
+			}
+		}
+		return null;
+	}
 }
