@@ -1,4 +1,4 @@
-import { SpfRecordObject } from "../types";
+import { SpfRecordObject, SpfValidationResults } from "../types";
 
 /**
  * Validates the syntax of a single SPF record string.
@@ -118,32 +118,61 @@ export class SpfValidator {
      * @param spfRecords An array of SpfRecordObject to validate.
      * @returns An array of validation results, including messages for issues found.
      */
-    validate(spfRecords: SpfRecordObject[]): any[] {
-        const results: any[] = [];
+    validate(spfRecords: SpfRecordObject[]): SpfValidationResults {
+        const results: SpfValidationResults = {
+            hasSpfRecord: { isValid: true },
+            syntaxValidation: { isValid: true, errors: [] },
+            oneInitialSpfRecord: { isValid: true },
+            maxTenSpfRecords: { isValid: true },
+            deprecatedMechanisms: { isValid: true, errors: [] },
+            unsafeAllMechanism: { isValid: true, errors: [] },
+            firstAllQualifier: { qualifier: null }
+        };
 
-        // Check if any SPF record exists.
-        if (!this.hasSpfRecord(spfRecords)) {
-            results.push({ message: "No SPF record found." });
+        // 1. Check if any SPF record exists.
+        const hasRecord = this.hasSpfRecord(spfRecords);
+        results.hasSpfRecord.isValid = hasRecord;
+        if (!hasRecord) {
+            results.hasSpfRecord.message = "No SPF record found.";
+            // If no SPF record, no further validation can be performed.
             return results;
         }
 
-        // Validate the syntax of each SPF record.
-        results.push(...this.validateSpfSyntax(spfRecords));
+        // 2. Validate the syntax of each SPF record.
+        const syntaxErrors = this.validateSpfSyntax(spfRecords);
+        results.syntaxValidation.isValid = syntaxErrors.length === 0;
+        results.syntaxValidation.errors = syntaxErrors;
 
-        // Check for exactly one initial SPF record.
-        if (!this.hasOneInitialSpfRecord(spfRecords)) {
-            results.push({ message: "There should be exactly one initial SPF record." });
+        // 3. Check for exactly one initial SPF record.
+        const hasOneInitial = this.hasOneInitialSpfRecord(spfRecords);
+        results.oneInitialSpfRecord.isValid = hasOneInitial;
+        if (!hasOneInitial) {
+            results.oneInitialSpfRecord.message = "There should be exactly one initial SPF record.";
         }
 
-        // Check for the maximum number of SPF record lookups.
-        if (!this.hasMaxTenSpfRecords(spfRecords)) {
-            results.push({ message: "The number of SPF record lookups should not exceed 10." });
+        // 4. Check for the maximum number of SPF record lookups.
+        const hasMaxTen = this.hasMaxTenSpfRecords(spfRecords);
+        results.maxTenSpfRecords.isValid = hasMaxTen;
+        if (!hasMaxTen) {
+            results.maxTenSpfRecords.message = "The number of SPF record lookups should not exceed 10.";
         }
 
-        // Check for deprecated mechanisms.
-        results.push(...this.checkDeprecatedMechanisms(spfRecords));
-        // Check for unsafe "+all" or "all" mechanisms.
-        results.push(...this.isPassAll(spfRecords));
+        // 5. Check for deprecated mechanisms.
+        const deprecatedErrors = this.checkDeprecatedMechanisms(spfRecords);
+        results.deprecatedMechanisms.isValid = deprecatedErrors.length === 0;
+        results.deprecatedMechanisms.errors = deprecatedErrors;
+
+        // 6. Check for unsafe "+all" or "all" mechanisms.
+        const unsafeAllErrors = this.isPassAll(spfRecords);
+        results.unsafeAllMechanism.isValid = unsafeAllErrors.length === 0;
+        results.unsafeAllMechanism.errors = unsafeAllErrors;
+
+        // 7. Get the qualifier of the first "all" mechanism.
+        const qualifier = this.getFirstAllQualifier(spfRecords);
+        results.firstAllQualifier.qualifier = qualifier;
+        if (!qualifier) {
+            results.firstAllQualifier.message = "No 'all' mechanism found in initial or redirect records.";
+        }
 
         return results;
     }

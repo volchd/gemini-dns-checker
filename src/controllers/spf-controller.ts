@@ -1,6 +1,7 @@
 import { getSpfRecord } from '../services/spf-service';
 import { SpfValidator } from '../services/spf-validator';
 import { Context } from 'hono';
+import { SpfValidationResults } from '../types';
 
 /**
  * Handles requests related to SPF record validation.
@@ -25,7 +26,7 @@ export async function handleSpfRequest(c: Context): Promise<Response> {
 		// Create an instance of SpfValidator.
 		const spfValidator = new SpfValidator();
 		// Validate the fetched SPF records.
-		const validationResults = spfValidator.validate(spfRecords);
+		const validationResults: SpfValidationResults = spfValidator.validate(spfRecords);
 		// Return the domain, SPF records, and validation results as a JSON response.
 		return c.json({ domain, spfRecords, validationResults });
 	} catch (error) {
