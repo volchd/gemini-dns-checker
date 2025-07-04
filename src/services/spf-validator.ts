@@ -92,13 +92,48 @@ class SyntaxValidator {
             errors.push(`Mechanism "${name}" requires a value`);
         }
         // Validate IPv4 address format for "ip4" mechanism.
-        if (name === 'ip4' && value && !/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(value)) {
+        if (name === 'ip4' && value && !this.isValidIp4(value)) {
             errors.push(`Invalid IPv4 address for "ip4": ${value}`);
         }
         // Validate IPv6 address format for "ip6" mechanism.
         if (name === 'ip6' && value && !this.isValidateIp6(value)) {
             errors.push(`Invalid IPv6 address for "ip6": ${value}`);
         }
+    }
+
+    /**
+     * Validate an SPF ip4 mechanism.
+     * @param value  The literal after "ip4:", e.g. "192.168.1.1" or "192.168.1.0/24"
+     * @returns      true  → syntactically valid
+     *               false → invalid
+     */
+    private isValidIp4(value: string): boolean {
+        const parts = value.split('/');
+        const ip = parts[0];
+        const cidr = parts[1];
+
+        // Validate IP address format and octets
+        const octets = ip.split('.');
+        if (octets.length !== 4) {
+            return false;
+        }
+
+        for (const octet of octets) {
+            const num = parseInt(octet, 10);
+            if (isNaN(num) || num < 0 || num > 255) {
+                return false;
+            }
+        }
+
+        // Validate CIDR if present
+        if (cidr !== undefined) {
+            const cidrNum = parseInt(cidr, 10);
+            if (isNaN(cidrNum) || cidrNum < 0 || cidrNum > 32) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -358,6 +393,12 @@ export class SpfValidator {
         while ((match = regex.exec(splitRecordString)) !== null) {
             segments.push(match[1]);
         }
+        
+        // If no quoted segments found, return the original string
+        if (segments.length === 0) {
+            return splitRecordString;
+        }
+        
         return segments.join('');
     }
 }
