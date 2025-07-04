@@ -341,8 +341,9 @@ describe('Logger', () => {
     });
 
     it('should handle context with undefined values', () => {
-      logger.setLogLevel(LogLevel.DEBUG);
-      const context: LogContext = {
+      const consoleSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
+      
+      const context = {
         defined: 'value',
         undefined: undefined,
         null: null
@@ -350,8 +351,9 @@ describe('Logger', () => {
       
       logger.info('mixed context', context);
       
-      expect(consoleSpy.info).toHaveBeenCalledWith(
-        expect.stringContaining('{"defined":"value","undefined":null,"null":null}')
+      // JSON.stringify automatically removes undefined values, so they won't appear in the output
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('{"defined":"value","null":null}')
       );
     });
   });

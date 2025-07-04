@@ -34,9 +34,41 @@ export class Logger {
 
   private formatMessage(level: LogLevel, message: string, context?: LogContext): string {
     const timestamp = new Date().toISOString();
-    const contextStr = context ? ` | ${JSON.stringify(context)}` : '';
+    const contextStr = context ? ` | ${this.safeJsonStringify(context)}` : '';
     return `[${timestamp}] ${level.toUpperCase()}: ${message}${contextStr}`;
   }
+
+  private safeJsonStringify(obj: any): string {
+    try {
+      return JSON.stringify(obj);
+    } catch (error) {
+      // Handle circular references and other JSON errors
+      try {
+        return JSON.stringify(obj, (key, value) => {
+          if (value === null || value === undefined) {
+            return null;
+          }
+          if (typeof value === 'object') {
+            // Simple circular reference detection
+            if (this.stringifyCache && this.stringifyCache.has(value)) {
+              return '[Circular]';
+            }
+            if (!this.stringifyCache) {
+              this.stringifyCache = new WeakSet();
+            }
+            this.stringifyCache.add(value);
+          }
+          return value;
+        });
+      } catch (fallbackError) {
+        return '[Object - Unable to serialize]';
+      } finally {
+        this.stringifyCache = undefined;
+      }
+    }
+  }
+
+  private stringifyCache?: WeakSet<object>;
 
   debug(message: string, context?: LogContext): void {
     if (this.shouldLog(LogLevel.DEBUG)) {

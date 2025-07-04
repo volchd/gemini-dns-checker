@@ -56,33 +56,29 @@ describe('SPF Service', () => {
 
     it('should handle multiple SPF records', async () => {
       const mockResponse = {
-        Status: 0,
         Answer: [
           {
-            name: 'example.com',
             type: 16,
-            TTL: 300,
             data: '"v=spf1 ip4:192.168.1.0/24 ~all"'
           },
           {
-            name: 'example.com',
             type: 16,
-            TTL: 300,
-            data: '"v=spf1 include:backup.example.com ~all"'
+            data: '"v=spf1 ip4:10.0.0.0/8 -all"'
           }
         ]
       };
 
+      // Mock fetch to return the response with multiple SPF records
       (fetch as jest.Mock).mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockResponse)
       });
 
-      const result = await getSpfRecord('example.com', new Set(), 'initial', testConfig);
+      const spfRecords = await getSpfRecord('example.com', new Set(), 'initial', testConfig);
 
-      expect(result).toHaveLength(2);
-      expect(result[0].spfRecord).toBe('"v=spf1 ip4:192.168.1.0/24 ~all"');
-      expect(result[1].spfRecord).toBe('"v=spf1 include:backup.example.com ~all"');
+      expect(spfRecords).toHaveLength(2);
+      expect(spfRecords[0].spfRecord).toBe('"v=spf1 ip4:192.168.1.0/24 ~all"');
+      expect(spfRecords[1].spfRecord).toBe('"v=spf1 ip4:10.0.0.0/8 -all"');
     });
 
     it('should process include mechanisms recursively', async () => {

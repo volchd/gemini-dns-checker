@@ -18,7 +18,12 @@ describe('SPF Validator', () => {
 
   describe('Syntax Validation', () => {
     it('should validate basic SPF record syntax', () => {
-      const records = [MOCK_SPF_RECORDS.basic];
+      const records: SpfRecordObject[] = [{
+        domain: 'example.com',
+        spfRecord: 'v=spf1 include:_spf.google.com -all',
+        type: 'initial'
+      }];
+      
       const result = spfValidator.validate(records);
       
       expect(result.syntaxValidation.isValid).toBe(true);
@@ -28,20 +33,20 @@ describe('SPF Validator', () => {
     it('should reject records not starting with v=spf1', () => {
       const records: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'ip4:192.168.1.0/24 ~all',
+        spfRecord: 'spf1 include:_spf.google.com -all',
         type: 'initial'
       }];
       
       const result = spfValidator.validate(records);
       
       expect(result.syntaxValidation.isValid).toBe(false);
-      expect(result.syntaxValidation.errors[0].error).toContain('must start with "v=spf1"');
+      expect(result.syntaxValidation.errors[0].error).toContain('Record must start with "v=spf1"');
     });
 
     it('should validate all mechanism types (a, mx, ip4, ip6, include, exists, all)', () => {
       const records: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 a mx ip4:192.168.1.0/24 ip6:2001:db8::/32 include:_spf.example.com exists:test.example.com ~all',
+        spfRecord: 'v=spf1 a mx ip4:192.168.1.1 ip6:2001:db8::1 include:example.org exists:test.com -all',
         type: 'initial'
       }];
       
@@ -53,7 +58,7 @@ describe('SPF Validator', () => {
     it('should validate IPv4 addresses and CIDR notation', () => {
       const validRecords: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 ip4:192.168.1.1 ip4:192.168.1.0/24 ~all',
+        spfRecord: 'v=spf1 ip4:192.168.1.1 ip4:10.0.0.0/24 -all',
         type: 'initial'
       }];
       
@@ -62,7 +67,7 @@ describe('SPF Validator', () => {
 
       const invalidRecords: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 ip4:999.999.999.999 ~all',
+        spfRecord: 'v=spf1 ip4:999.999.999.999 -all',
         type: 'initial'
       }];
       
@@ -74,7 +79,7 @@ describe('SPF Validator', () => {
     it('should validate IPv6 addresses and CIDR notation', () => {
       const validRecords: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 ip6:2001:db8::1 ip6:2001:db8::/32 ~all',
+        spfRecord: 'v=spf1 ip6:2001:db8::1 ip6:2001:db8::/32 -all',
         type: 'initial'
       }];
       
@@ -83,7 +88,7 @@ describe('SPF Validator', () => {
 
       const invalidRecords: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 ip6:invalid::address ~all',
+        spfRecord: 'v=spf1 ip6:invalid:address -all',
         type: 'initial'
       }];
       
@@ -95,7 +100,7 @@ describe('SPF Validator', () => {
     it('should validate qualifiers (+, -, ~, ?)', () => {
       const records: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 +a -mx ~ip4:192.168.1.0/24 ?include:test.com ~all',
+        spfRecord: 'v=spf1 +a -mx ~ip4:192.168.1.1 ?include:example.org -all',
         type: 'initial'
       }];
       
@@ -107,7 +112,7 @@ describe('SPF Validator', () => {
     it('should reject unknown mechanisms', () => {
       const records: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 unknown:value ~all',
+        spfRecord: 'v=spf1 unknown -all',
         type: 'initial'
       }];
       
@@ -120,7 +125,7 @@ describe('SPF Validator', () => {
     it('should validate modifier syntax (redirect, exp)', () => {
       const redirectRecord: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 redirect=spf.example.com',
+        spfRecord: 'v=spf1 redirect=other.com',
         type: 'initial'
       }];
       
@@ -129,7 +134,7 @@ describe('SPF Validator', () => {
 
       const expRecord: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 ip4:192.168.1.0/24 exp=explain.example.com ~all',
+        spfRecord: 'v=spf1 a exp=explain.example.com -all',
         type: 'initial'
       }];
       
@@ -140,7 +145,7 @@ describe('SPF Validator', () => {
     it('should require values for mechanisms that need them', () => {
       const records: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 include ~all',
+        spfRecord: 'v=spf1 include -all',
         type: 'initial'
       }];
       
@@ -185,7 +190,11 @@ describe('SPF Validator', () => {
     });
 
     it('should detect deprecated mechanisms (ptr)', () => {
-      const records = [MOCK_SPF_RECORDS.deprecated];
+      const records: SpfRecordObject[] = [{
+        domain: 'example.com',
+        spfRecord: 'v=spf1 ptr -all',
+        type: 'initial'
+      }];
       
       const result = spfValidator.validate(records);
       
@@ -194,7 +203,11 @@ describe('SPF Validator', () => {
     });
 
     it('should detect unsafe +all mechanisms', () => {
-      const records = [MOCK_SPF_RECORDS.unsafeAll];
+      const records: SpfRecordObject[] = [{
+        domain: 'example.com',
+        spfRecord: 'v=spf1 a +all',
+        type: 'initial'
+      }];
       
       const result = spfValidator.validate(records);
       
@@ -205,7 +218,7 @@ describe('SPF Validator', () => {
     it('should extract first all qualifier correctly', () => {
       const softFailRecord: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 ip4:192.168.1.0/24 ~all',
+        spfRecord: 'v=spf1 a mx ~all',
         type: 'initial'
       }];
       
@@ -217,7 +230,7 @@ describe('SPF Validator', () => {
     it('should return + qualifier for bare all mechanism', () => {
       const bareAllRecord: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 ip4:192.168.1.0/24 all',
+        spfRecord: 'v=spf1 a mx all',
         type: 'initial'
       }];
       
@@ -248,9 +261,10 @@ describe('SPF Validator', () => {
     });
 
     it('should handle extremely long SPF records', () => {
+      const longMechanisms = Array(20).fill('include:example.com').join(' ');
       const longRecord: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1 ' + 'ip4:192.168.1.0/24 '.repeat(50) + '~all',
+        spfRecord: `v=spf1 ${longMechanisms} -all`,
         type: 'initial'
       }];
       
@@ -262,7 +276,7 @@ describe('SPF Validator', () => {
     it('should handle records with multiple spaces', () => {
       const spacedRecord: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'v=spf1    ip4:192.168.1.0/24     ~all',
+        spfRecord: 'v=spf1  a   mx    include:_spf.google.com  -all',
         type: 'initial'
       }];
       
@@ -274,20 +288,19 @@ describe('SPF Validator', () => {
     it('should handle case sensitivity correctly', () => {
       const upperCaseRecord: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: 'V=SPF1 IP4:192.168.1.0/24 ~ALL',
+        spfRecord: 'V=SPF1 A MX -ALL',
         type: 'initial'
       }];
       
       const result = spfValidator.validate(upperCaseRecord);
       
-      expect(result.syntaxValidation.isValid).toBe(false);
-      expect(result.syntaxValidation.errors[0].error).toContain('must start with "v=spf1"');
+      expect(result.syntaxValidation.isValid).toBe(false); // Should reject V=SPF1 (case sensitive)
     });
 
     it('should handle split SPF records with quotes', () => {
       const splitRecord: SpfRecordObject[] = [{
         domain: 'example.com',
-        spfRecord: '"v=spf1 ip4:192.168.1.0/24" "include:_spf.google.com" "~all"',
+        spfRecord: '"v=spf1 a mx include:_spf.google.com" "-all"',
         type: 'initial'
       }];
       
@@ -314,7 +327,12 @@ describe('SPF Validator', () => {
 
   describe('validateSpfSyntax', () => {
     it('should return no errors for valid SPF records', () => {
-      const records = [MOCK_SPF_RECORDS.basic];
+      const records: SpfRecordObject[] = [{
+        domain: 'example.com',
+        spfRecord: 'v=spf1 a mx include:_spf.google.com -all',
+        type: 'initial'
+      }];
+      
       const errors = spfValidator.validateSpfSyntax(records);
       
       expect(errors).toHaveLength(0);

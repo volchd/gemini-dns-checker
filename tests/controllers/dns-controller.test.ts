@@ -348,14 +348,13 @@ describe('DNS Controller', () => {
       // Verify that performance metrics are included in logs
       expect(loggerInfoSpy).toHaveBeenCalled();
       
-      // Check that at least one call includes performance context
+      // Check that at least one logged message includes performance metrics
       const logCalls = loggerInfoSpy.mock.calls;
-      const hasPerformanceContext = logCalls.some(call => 
-        call.length > 1 && 
-        typeof call[1] === 'object' && 
-        ('responseTime' in call[1] || 'queryTime' in call[1])
+      const hasPerformanceMetrics = logCalls.some(call => 
+        call[0] && typeof call[0] === 'string' && 
+        (call[0].includes('responseTime') || call[0].includes('queryTime'))
       );
-      expect(hasPerformanceContext).toBe(true);
+      expect(hasPerformanceMetrics).toBe(true);
     });
   });
 

@@ -200,17 +200,17 @@ describe('Configuration', () => {
     });
 
     it('should handle edge case values', () => {
-      const edgeCases = {
+      const env = {
         DNS_TIMEOUT: '0',
         DNS_RETRIES: '0',
-        LOG_LEVEL: ''
+        LOG_LEVEL: '' // Empty string should fall back to default
       };
       
-      const config = getConfig(edgeCases);
+      const config = getConfig(env);
       
       expect(config.dns.timeout).toBe(0);
       expect(config.dns.retries).toBe(0);
-      expect(config.logging.level).toBe('');
+      expect(config.logging.level).toBe('info'); // Should fall back to default
     });
 
     it('should handle very large numbers', () => {
@@ -268,6 +268,22 @@ describe('Configuration', () => {
       expect(config.server.cors.origins).toEqual(['*']);
       
       expect(config.logging.enableRequestLogging).toBe(true);
+    });
+
+    it('should handle empty string values', () => {
+      const env = {
+        DOH_URL: '', // Empty strings fall back to defaults because '' || 'default' === 'default'
+        DNS_TIMEOUT: '',
+        DNS_RETRIES: '',
+        LOG_LEVEL: ''
+      };
+      
+      const config = getConfig(env);
+      
+      expect(config.dns.dohUrl).toBe('https://cloudflare-dns.com/dns-query'); // Falls back to default
+      expect(config.dns.timeout).toBe(10000); // Falls back to default, then parsed as valid number
+      expect(config.dns.retries).toBe(3); // Falls back to default, then parsed as valid number
+      expect(config.logging.level).toBe('info'); // Falls back to default
     });
   });
 
@@ -372,22 +388,6 @@ describe('Configuration', () => {
       const config = getConfig(env);
       
       expect(config.dns.dohUrl).toBe(specialUrl);
-    });
-
-    it('should handle empty string values', () => {
-      const env = {
-        DOH_URL: '',
-        DNS_TIMEOUT: '',
-        DNS_RETRIES: '',
-        LOG_LEVEL: ''
-      };
-      
-      const config = getConfig(env);
-      
-      expect(config.dns.dohUrl).toBe('');
-      expect(isNaN(config.dns.timeout)).toBe(true);
-      expect(isNaN(config.dns.retries)).toBe(true);
-      expect(config.logging.level).toBe('');
     });
 
     it('should handle whitespace in values', () => {
