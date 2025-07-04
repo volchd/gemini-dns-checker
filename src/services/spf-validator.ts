@@ -1,4 +1,5 @@
 import { SpfRecordObject, SpfValidationResults } from "../types";
+import { SpfScorer } from "./spf-scorer";
 import ipaddr from 'ipaddr.js';
 
 /**
@@ -182,6 +183,7 @@ class SyntaxValidator {
  */
 export class SpfValidator {
     private syntaxValidator = new SyntaxValidator();
+    private scorer = new SpfScorer();
 
     /**
      * Validates a list of SPF record objects against various rules and best practices.
@@ -252,6 +254,24 @@ export class SpfValidator {
         }
 
         return results;
+    }
+
+    /**
+     * Validates SPF records and returns both validation results and scoring
+     * @param spfRecords An array of SpfRecordObject to validate.
+     * @returns Object containing validation results and scoring results
+     */
+    validateWithScoring(spfRecords: SpfRecordObject[]): {
+        validationResults: SpfValidationResults;
+        scoringResults: ReturnType<SpfScorer['calculateScore']>;
+    } {
+        const validationResults = this.validate(spfRecords);
+        const scoringResults = this.scorer.calculateScore(spfRecords, validationResults);
+        
+        return {
+            validationResults,
+            scoringResults
+        };
     }
 
     /**

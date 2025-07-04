@@ -39,3 +39,20 @@ export interface SpfValidationResults {
         message?: string;
     };
 }
+
+export interface SpfScoreItem {
+    name: string;
+    description: string;
+    score: number;
+    maxScore: number;
+    passed: boolean;
+    details?: string;
+}
+
+export interface SpfScoringResults {
+    totalScore: number;
+    maxPossibleScore: number;
+    percentage: number;
+    grade: string;
+    scoreItems: SpfScoreItem[];
+}

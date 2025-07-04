@@ -13,6 +13,15 @@ jest.mock('../../src/services/spf-validator');
 const mockSpfService = spfService as jest.Mocked<typeof spfService>;
 const MockSpfValidator = SpfValidator as jest.MockedClass<typeof SpfValidator>;
 
+// Helper function to create mock scoring results
+const createMockScoringResults = (totalScore: number = 35) => ({
+  totalScore,
+  maxPossibleScore: 37,
+  percentage: Math.round((totalScore / 37) * 100),
+  grade: totalScore >= 33 ? 'A' : totalScore >= 30 ? 'B' : totalScore >= 26 ? 'C' : totalScore >= 22 ? 'D' : 'F',
+  scoreItems: []
+});
+
 // Mock crypto.randomUUID
 Object.defineProperty(global, 'crypto', {
   value: {
@@ -31,7 +40,7 @@ describe('SPF Controller', () => {
     
     // Create mock validator instance
     mockValidator = {
-      validate: jest.fn()
+      validateWithScoring: jest.fn()
     } as any;
     MockSpfValidator.mockImplementation(() => mockValidator);
     
@@ -72,7 +81,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       await controller(mockContext as Context);
 
@@ -82,11 +94,12 @@ describe('SPF Controller', () => {
         'initial', 
         testConfig
       );
-      expect(mockValidator.validate).toHaveBeenCalledWith(mockSpfRecords);
+      expect(mockValidator.validateWithScoring).toHaveBeenCalledWith(mockSpfRecords);
       expect(mockContext.json).toHaveBeenCalledWith({
         domain: 'example.com',
         spfRecords: mockSpfRecords,
         validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35),
         requestId: 'test-spf-request-id-456',
         responseTime: expect.any(Number),
         timestamp: expect.any(String)
@@ -111,7 +124,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       await controller(mockContext as Context);
 
@@ -120,6 +136,7 @@ describe('SPF Controller', () => {
       expect(response).toHaveProperty('domain', 'example.com');
       expect(response).toHaveProperty('spfRecords');
       expect(response).toHaveProperty('validationResults');
+      expect(response).toHaveProperty('scoringResults');
       expect(response).toHaveProperty('requestId');
       expect(response).toHaveProperty('responseTime');
       expect(response).toHaveProperty('timestamp');
@@ -141,7 +158,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(25)
+      });
 
       await controller(mockContext as Context);
 
@@ -176,7 +196,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('no-spf-domain.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(0)
+      });
 
       await controller(mockContext as Context);
 
@@ -205,7 +228,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('complex-spf.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       await controller(mockContext as Context);
 
@@ -265,7 +291,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('  EXAMPLE.COM  ');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       await controller(mockContext as Context);
 
@@ -383,7 +412,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       await controller(mockContext as Context);
 
@@ -393,6 +425,7 @@ describe('SPF Controller', () => {
       expect(response).toHaveProperty('domain');
       expect(response).toHaveProperty('spfRecords');
       expect(response).toHaveProperty('validationResults');
+      expect(response).toHaveProperty('scoringResults');
       expect(response).toHaveProperty('requestId');
       expect(response).toHaveProperty('responseTime');
       expect(response).toHaveProperty('timestamp');
@@ -421,7 +454,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       await controller(mockContext as Context);
 
@@ -456,7 +492,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       const startTime = Date.now();
       await controller(mockContext as Context);
@@ -488,7 +527,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       await controller(mockContext as Context);
 
@@ -526,7 +568,10 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(0)
+      });
 
       await controller(mockContext as Context);
 
@@ -542,7 +587,7 @@ describe('SPF Controller', () => {
       mockContext.req!.query = jest.fn().mockReturnValue('example.com');
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockImplementation(() => {
+      mockValidator.validateWithScoring.mockImplementation(() => {
         throw new Error('Validator error');
       });
 
@@ -575,7 +620,10 @@ describe('SPF Controller', () => {
       mockContext.req!.header = jest.fn().mockReturnValue(undefined);
       mockContext.json = jest.fn().mockReturnValue(new Response());
       mockSpfService.getSpfRecord.mockResolvedValue(mockSpfRecords);
-      mockValidator.validate.mockReturnValue(mockValidationResults);
+      mockValidator.validateWithScoring.mockReturnValue({
+        validationResults: mockValidationResults,
+        scoringResults: createMockScoringResults(35)
+      });
 
       await controller(mockContext as Context);
 

@@ -61,9 +61,9 @@ export function createSpfController(config: AppConfig) {
     // Fetch SPF records for the given domain using the spf-service
     const spfRecords = await getSpfRecord(sanitizedDomain, new Set(), 'initial', config);
     
-    // Create an instance of SpfValidator and validate the fetched SPF records
+    // Create an instance of SpfValidator and validate the fetched SPF records with scoring
     const spfValidator = new SpfValidator();
-    const validationResults: SpfValidationResults = spfValidator.validate(spfRecords);
+    const { validationResults, scoringResults } = spfValidator.validateWithScoring(spfRecords);
     
     const responseTime = Date.now() - startTime;
     
@@ -71,14 +71,18 @@ export function createSpfController(config: AppConfig) {
       requestId, 
       domain: sanitizedDomain,
       recordCount: spfRecords.length,
+      score: scoringResults.totalScore,
+      percentage: scoringResults.percentage,
+      grade: scoringResults.grade,
       responseTime 
     });
 
-    // Return the domain, SPF records, and validation results as a JSON response
+    // Return the domain, SPF records, validation results, and scoring results as a JSON response
     return c.json({ 
       domain: sanitizedDomain, 
       spfRecords, 
       validationResults,
+      scoringResults,
       requestId,
       responseTime,
       timestamp: new Date().toISOString()
