@@ -1,51 +1,145 @@
-import { checkDnsRegistration } from "../../src/services/dns-service";
+import { checkDnsRegistration, queryDnsRecord } from '../../src/services/dns-service';
+import { getConfig } from '../../src/config';
 
-// Mock the global fetch function
+// Mock fetch globally
 global.fetch = jest.fn();
 
-const mockFetchResponse = (ok: boolean, Status: number, Answer?: any[]) =>
-	Promise.resolve({
-		ok,
-		json: async () => ({
-			Status,
-			Answer,
-		}),
-	});
+describe('DNS Service', () => {
+  const testConfig = getConfig();
 
-describe("checkDnsRegistration", () => {
-	beforeEach(() => {
-		global.fetch = jest.fn();
-	});
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-		it("should return isRegistered: true for a registered domain", async () => {
-		(global.fetch as jest.Mock).mockResolvedValueOnce(mockFetchResponse(true, 0, [{ name: "google.com.", type: 1, TTL: 3600, data: "172.217.10.142" }]));
+  describe('checkDnsRegistration', () => {
+    it('should return registered domain information', async () => {
+      const mockResponse = {
+        Status: 0,
+        Answer: [
+          {
+            name: 'example.com',
+            type: 1,
+            TTL: 300,
+            data: '93.184.216.34'
+          }
+        ]
+      };
 
-		const result = await checkDnsRegistration("google.com");
-		expect(result.isRegistered).toBe(true);
-		expect(result.domain).toBe("google.com");
-	});
+      (fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse)
+      });
 
-	it("should return isRegistered: false for an unregistered domain", async () => {
-		(global.fetch as jest.Mock).mockResolvedValueOnce(mockFetchResponse(true, 3)); // NXDOMAIN
+      const result = await checkDnsRegistration('example.com', testConfig);
 
-		const result = await checkDnsRegistration("unregistered-domain.com");
-		expect(result.isRegistered).toBe(false);
-		expect(result.domain).toBe("unregistered-domain.com");
-	});
+      expect(result).toEqual({
+        domain: 'example.com',
+        isRegistered: true,
+        dnsResponse: mockResponse,
+        queryTime: expect.any(Number)
+      });
 
-	it("should throw an error if the DoH query fails", async () => {
-		(global.fetch as jest.Mock).mockResolvedValueOnce(mockFetchResponse(false, 200));
+      expect(fetch).toHaveBeenCalledWith(
+        `${testConfig.dns.dohUrl}?name=example.com&type=A`,
+        expect.objectContaining({
+          headers: { Accept: 'application/dns-json' }
+        })
+      );
+    });
 
-		await expect(checkDnsRegistration("google.com")).rejects.toThrow(
-			"DNS query failed"
-		);
-	});
+    it('should return unregistered domain information', async () => {
+      const mockResponse = {
+        Status: 3, // NXDOMAIN
+        Answer: []
+      };
 
-	it("should throw an error if the fetch call fails", async () => {
-		(global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
+      (fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse)
+      });
 
-		await expect(checkDnsRegistration("google.com")).rejects.toThrow(
-			"DNS query failed"
-		);
-	});
-});
+      const result = await checkDnsRegistration('nonexistent-domain-12345.com', testConfig);
+
+      expect(result).toEqual({
+        domain: 'nonexistent-domain-12345.com',
+        isRegistered: false,
+        dnsResponse: mockResponse,
+        queryTime: expect.any(Number)
+      });
+    });
+
+    it('should retry on failure and eventually succeed', async () => {
+      const mockResponse = {
+        Status: 0,
+        Answer: []
+      };
+
+      (fetch as jest.Mock)
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse)
+        });
+
+      const result = await checkDnsRegistration('example.com', testConfig);
+
+      expect(result.isRegistered).toBe(true);
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should throw error after all retries fail', async () => {
+      (fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+
+      await expect(checkDnsRegistration('example.com', testConfig)).rejects.toThrow(
+        'DNS query failed after 3 attempts: Network error'
+      );
+
+      expect(fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('should handle HTTP error responses', async () => {
+      (fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error'
+      });
+
+      await expect(checkDnsRegistration('example.com', testConfig)).rejects.toThrow(
+        'DNS query failed after 3 attempts: HTTP 500: Internal Server Error'
+      );
+    });
+
+    it('should handle timeout', async () => {
+      (fetch as jest.Mock).mockImplementation(() => 
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('timeout')), 100)
+        )
+      );
+
+      await expect(checkDnsRegistration('example.com', testConfig)).rejects.toThrow(
+        'DNS query failed after 3 attempts: timeout'
+      );
+    });
+  });
+
+  describe('queryDnsRecord', () => {
+    it('should query specific record types', async () => {
+      const mockResponse = {
+        Status: 0,
+        Answer: []
+      };
+
+      (fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResponse)
+      });
+
+      await queryDnsRecord('example.com', 'TXT', testConfig);
+
+      expect(fetch).toHaveBeenCalledWith(
+        `${testConfig.dns.dohUrl}?name=example.com&type=TXT`,
+        expect.any(Object)
+      );
+    });
+  });
+}); 

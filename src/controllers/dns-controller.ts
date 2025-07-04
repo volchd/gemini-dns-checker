@@ -1,49 +1,99 @@
 import { Context } from "hono";
 import { checkDnsRegistration } from "../services/dns-service";
+import { DomainValidator, ValidationError } from "../utils/validation";
+import { logger } from "../utils/logger";
+import { AppConfig } from "../config";
 
 /**
- * Handles the DNS check request.
- * It extracts the domain from the query parameters, validates it,
- * and then calls the dns-service to check its registration.
- * @param c The Hono context object.
- * @returns A JSON response indicating the DNS check result or an error.
+ * Creates a DNS check handler with the provided configuration.
+ * @param config The application configuration.
+ * @returns A function that handles DNS check requests.
  */
-export async function checkDns(c: Context): Promise<Response> {
-	// Extract the 'domain' query parameter from the request.
-	const domain = c.req.query("domain");
+export function createDnsController(config: AppConfig) {
+  return async function checkDns(c: Context): Promise<Response> {
+    const startTime = Date.now();
+    const requestId = crypto.randomUUID();
+    
+    logger.info(`DNS check request received`, { 
+      requestId, 
+      endpoint: '/checkDNS',
+      userAgent: c.req.header('User-Agent') 
+    });
 
-	// If the domain parameter is missing, log an error and return a 400 Bad Request response.
-	if (!domain) {
-		console.log("Domain parameter is missing");
-		return c.json({ error: "Domain parameter is required" }, 400);
-	}
+    try {
+      // Extract and validate the domain parameter
+      const domain = c.req.query("domain");
+      
+      if (!domain) {
+        logger.warn(`DNS check request missing domain parameter`, { requestId });
+        return c.json({ 
+          error: "Domain parameter is required",
+          requestId 
+        }, 400);
+      }
 
-	console.log(`Received request to check domain: ${domain}`);
+      // Validate and sanitize the domain
+      try {
+        DomainValidator.validate(domain);
+      } catch (validationError) {
+        const error = validationError as ValidationError;
+        logger.warn(`DNS check request with invalid domain`, { 
+          requestId, 
+          domain, 
+          error: error.message 
+        });
+        return c.json({ 
+          error: error.message,
+          field: error.field,
+          requestId 
+        }, 400);
+      }
 
-	// Basic domain validation using a regular expression.
-	const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+$/;
-	// If the domain format is invalid, log an error and return a 400 Bad Request response.
-	if (!domainRegex.test(domain)) {
-		console.log(`Invalid domain format: ${domain}`);
-		return c.json({ error: "Invalid domain format" }, 400);
-	}
+      const sanitizedDomain = DomainValidator.sanitize(domain);
+      
+      logger.info(`Starting DNS registration check`, { 
+        requestId, 
+        domain: sanitizedDomain 
+      });
 
-	try {
-		console.log(`Checking DNS registration for domain: ${domain}`);
-		// Call the dns-service to perform the actual DNS registration check.
-		const result = await checkDnsRegistration(domain);
-		console.log(`DNS check completed for domain: ${domain}`);
-		// Return the result as a JSON response.
-		return c.json(result);
-	} catch (error) {
-		// Catch any errors that occur during the DNS check.
-		console.error(`Error checking DNS for domain: ${domain}`, error);
-		// If the error is an instance of Error, return its message in the response.
-		if (error instanceof Error) {
-			return c.json({ error: error.message }, 500);
-		} else {
-			// For unknown errors, return a generic error message.
-			return c.json({ error: "An unknown error occurred" }, 500);
-		}
-	}
+      // Perform the DNS check
+      const result = await checkDnsRegistration(sanitizedDomain, config);
+      
+      const responseTime = Date.now() - startTime;
+      
+      logger.info(`DNS check completed successfully`, { 
+        requestId, 
+        domain: sanitizedDomain,
+        isRegistered: result.isRegistered,
+        responseTime 
+      });
+
+      // Return the result with additional metadata
+      return c.json({
+        ...result,
+        requestId,
+        responseTime,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      
+      logger.error(`DNS check failed`, error as Error, { 
+        requestId, 
+        responseTime 
+      });
+
+      // Return appropriate error response
+      const statusCode = error instanceof Error && error.message.includes('timeout') ? 504 : 500;
+      
+      return c.json({ 
+        error: errorMessage,
+        requestId,
+        responseTime,
+        timestamp: new Date().toISOString()
+      }, statusCode);
+    }
+  };
 }

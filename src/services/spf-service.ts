@@ -1,5 +1,5 @@
 import { DnsResponse, SpfRecordObject } from "../types";
-import { dohUrl } from "../config";
+import { AppConfig } from "../config";
 
 /**
  * Recursively fetches SPF records for a given domain and its included/redirected domains.
@@ -7,10 +7,11 @@ import { dohUrl } from "../config";
  * @param domain The domain to fetch SPF records for.
  * @param visitedDomains A Set to keep track of domains already visited to prevent circular dependencies.
  * @param recordType The type of SPF record being processed (initial, include, or redirect).
+ * @param config Configuration object for DNS settings.
  * @returns A promise that resolves to an array of SpfRecordObject.
  * @throws Error if the DNS TXT query fails.
  */
-export async function getSpfRecord(domain: string, visitedDomains: Set<string> = new Set(), recordType: 'initial' | 'include' | 'redirect' = 'initial'): Promise<SpfRecordObject[]> {
+export async function getSpfRecord(domain: string, visitedDomains: Set<string> = new Set(), recordType: 'initial' | 'include' | 'redirect' = 'initial', config: AppConfig): Promise<SpfRecordObject[]> {
 	// Check for circular dependencies to prevent infinite loops.
 	if (visitedDomains.has(domain)) {
 		console.log(`Circular dependency detected for domain: ${domain}. Skipping.`);
@@ -21,7 +22,7 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 
 	console.log(`Performing SPF record lookup for domain: ${domain}`);
 	// Construct the DoH URL for TXT records.
-	const url = `${dohUrl}?name=${encodeURIComponent(domain)}&type=TXT`;
+	const url = `${config.dns.dohUrl}?name=${encodeURIComponent(domain)}&type=TXT`;
 
 	try {
 		// Make a fetch request to the DoH service for TXT records.
@@ -58,7 +59,7 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 					while ((match = includeRegex.exec(spfRecord)) !== null) {
 						const includedDomain = match[1];
 						console.log(`Found include mechanism for domain: ${includedDomain}`);
-						const includedSpfRecords = await getSpfRecord(includedDomain, visitedDomains, 'include');
+						const includedSpfRecords = await getSpfRecord(includedDomain, visitedDomains, 'include', config);
 						spfRecords.push(...includedSpfRecords);
 					}
 
@@ -68,7 +69,7 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 					if (match) {
 						const redirectedDomain = match[1];
 						console.log(`Found redirect mechanism for domain: ${redirectedDomain}`);
-						const redirectedSpfRecords = await getSpfRecord(redirectedDomain, visitedDomains, 'redirect');
+						const redirectedSpfRecords = await getSpfRecord(redirectedDomain, visitedDomains, 'redirect', config);
 						spfRecords.push(...redirectedSpfRecords);
 					}
 				}
