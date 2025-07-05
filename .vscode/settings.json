@@ -1,0 +1,17 @@
+{
+	"files.associations": {
+		"*.jsonc": "jsonc"
+	},
+	"search.exclude": {
+		"**/node_modules": true,
+		"**/dist": true,
+		"**/coverage": true,
+		"**/.git": true
+	},
+	"files.exclude": {
+		"**/node_modules": true,
+		"**/dist": true,
+		"**/coverage": true
+	},
+	"typescript.preferences.includePackageJsonAutoImports": "auto"
+}

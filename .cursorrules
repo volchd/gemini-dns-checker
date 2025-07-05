@@ -1,0 +1,152 @@
+# Gemini DNS Checker - Cursor Rules
+
+## Project Overview
+This is a TypeScript-based Cloudflare Worker project for DNS and SPF validation. The project uses:
+- TypeScript with strict mode
+- Cloudflare Workers runtime
+- Hono framework for HTTP handling
+- Jest for testing
+- ESLint for linting
+- Wrangler for deployment
+
+## Code Style & Standards
+
+### TypeScript
+- Use strict TypeScript with proper type annotations
+- Prefer interfaces over types for object shapes
+- Use explicit return types for public functions
+- Leverage TypeScript's built-in utility types
+- Always handle potential undefined/null values
+
+### Naming Conventions
+- Use camelCase for variables, functions, and methods
+- Use PascalCase for classes, interfaces, and types
+- Use UPPER_SNAKE_CASE for constants
+- Use descriptive names that explain purpose, not implementation
+
+### File Organization
+- Keep files focused on single responsibility
+- Use barrel exports (index.ts) for clean imports
+- Group related functionality in directories
+- Separate concerns: controllers, services, utilities, types
+
+### Error Handling
+- Use proper error types and messages
+- Implement graceful degradation
+- Log errors with appropriate context
+- Return meaningful error responses to clients
+
+## Cloudflare Workers Specific
+
+### Runtime Considerations
+- Workers run in a V8 isolate environment
+- No Node.js APIs available (use Web APIs instead)
+- Be mindful of CPU time limits (10ms for free tier)
+- Use appropriate caching strategies
+- Handle CORS properly for web requests
+
+### Performance
+- Minimize external API calls
+- Use efficient data structures
+- Implement proper timeout handling
+- Cache DNS lookups when appropriate
+- Use streaming responses for large data
+
+## DNS & SPF Validation Focus
+
+### DNS Operations
+- Implement proper DNS query handling
+- Use DNS-over-HTTPS (DoH) for security
+- Handle DNS timeouts and retries gracefully
+- Validate DNS responses before processing
+- Support multiple record types (A, AAAA, TXT, MX, etc.)
+
+### SPF Validation
+- Follow RFC 7208 SPF specification
+- Implement proper SPF record parsing
+- Handle SPF record length limits (255 characters)
+- Support SPF record flattening and optimization
+- Validate SPF syntax and mechanisms
+
+### Security Considerations
+- Validate all input data
+- Implement rate limiting
+- Sanitize user inputs
+- Use HTTPS for all external requests
+- Log security-relevant events
+
+## Testing Strategy
+
+### Test Coverage
+- Aim for >90% test coverage
+- Test both success and error scenarios
+- Mock external dependencies (DNS, HTTP)
+- Test edge cases and boundary conditions
+- Use descriptive test names
+
+### Test Organization
+- Mirror source directory structure in tests/
+- Use fixtures for test data
+- Group related tests with describe blocks
+- Use beforeEach/afterEach for setup/cleanup
+- Test both unit and integration scenarios
+
+## Code Quality
+
+### Documentation
+- Use JSDoc for public APIs
+- Include examples in documentation
+- Document complex business logic
+- Keep README up to date
+- Document configuration options
+
+### Code Review Guidelines
+- Ensure all tests pass
+- Check for proper error handling
+- Verify type safety
+- Review performance implications
+- Confirm security best practices
+
+## Development Workflow
+
+### Git Practices
+- Use conventional commit messages
+- Keep commits focused and atomic
+- Write meaningful commit descriptions
+- Use feature branches for new development
+
+### Deployment
+- Run full test suite before deployment
+- Use staging environment for testing
+- Monitor performance after deployment
+- Have rollback strategy ready
+
+## Common Patterns
+
+### Service Layer Pattern
+- Keep business logic in services
+- Use dependency injection for testability
+- Implement proper error handling
+- Use async/await consistently
+
+### Controller Pattern
+- Keep controllers thin
+- Handle HTTP-specific concerns only
+- Validate input data
+- Return appropriate HTTP status codes
+
+### Utility Functions
+- Keep utilities pure and stateless
+- Write comprehensive tests for utilities
+- Use TypeScript for type safety
+- Document complex algorithms
+
+## Avoid
+
+- Using Node.js specific APIs
+- Blocking operations in Workers
+- Hardcoding configuration values
+- Ignoring error cases
+- Writing untested code
+- Using any type without justification
+- Mixing concerns in single files 

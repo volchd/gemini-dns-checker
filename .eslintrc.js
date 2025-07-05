@@ -1,7 +1,7 @@
 module.exports = {
   parser: '@typescript-eslint/parser',
   parserOptions: {
-    ecmaVersion: 2020,
+    ecmaVersion: 2022,
     sourceType: 'module',
     project: './tsconfig.json',
   },
@@ -9,49 +9,117 @@ module.exports = {
   extends: [
     'eslint:recommended',
     '@typescript-eslint/recommended',
+    '@typescript-eslint/recommended-requiring-type-checking',
   ],
+  env: {
+    es2022: true,
+    node: false, // Cloudflare Workers don't have Node.js APIs
+  },
+  globals: {
+    // Cloudflare Workers globals
+    Response: 'readonly',
+    Request: 'readonly',
+    Headers: 'readonly',
+    URL: 'readonly',
+    URLSearchParams: 'readonly',
+    console: 'readonly',
+    setTimeout: 'readonly',
+    clearTimeout: 'readonly',
+    setInterval: 'readonly',
+    clearInterval: 'readonly',
+    fetch: 'readonly',
+    crypto: 'readonly',
+    TextEncoder: 'readonly',
+    TextDecoder: 'readonly',
+    btoa: 'readonly',
+    atob: 'readonly',
+  },
   rules: {
     // TypeScript specific rules
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-    '@typescript-eslint/explicit-function-return-type': 'off',
-    '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/explicit-function-return-type': 'warn',
+    '@typescript-eslint/explicit-module-boundary-types': 'warn',
+    '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/prefer-const': 'error',
     '@typescript-eslint/no-var-requires': 'error',
-    
+    '@typescript-eslint/prefer-nullish-coalescing': 'error',
+    '@typescript-eslint/prefer-optional-chain': 'error',
+    '@typescript-eslint/no-floating-promises': 'error',
+    '@typescript-eslint/await-thenable': 'error',
+    '@typescript-eslint/no-misused-promises': 'error',
+    '@typescript-eslint/require-await': 'error',
+    '@typescript-eslint/return-await': 'error',
+    '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+    '@typescript-eslint/prefer-as-const': 'error',
+    '@typescript-eslint/no-inferrable-types': 'error',
+    '@typescript-eslint/no-non-null-assertion': 'warn',
+    '@typescript-eslint/consistent-type-imports': [
+      'error',
+      { prefer: 'type-imports', disallowTypeAnnotations: false }
+    ],
+    '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+    '@typescript-eslint/member-ordering': 'error',
+    '@typescript-eslint/no-empty-function': 'warn',
+    '@typescript-eslint/no-empty-interface': 'error',
+    '@typescript-eslint/no-invalid-void-type': 'error',
+    '@typescript-eslint/prefer-function-type': 'error',
+    '@typescript-eslint/prefer-readonly': 'error',
+    '@typescript-eslint/prefer-readonly-parameter-types': 'warn',
+    '@typescript-eslint/type-annotation-spacing': 'error',
+    '@typescript-eslint/unified-signatures': 'error',
+
     // General rules
-    'no-console': 'off', // Allow console for logging
+    'no-console': 'warn',
     'no-debugger': 'error',
-    'no-duplicate-imports': 'error',
-    'no-unused-expressions': 'error',
-    'prefer-const': 'error',
-    'no-var': 'error',
-    
-    // Code style
-    'indent': ['error', 2],
-    'quotes': ['error', 'single'],
-    'semi': ['error', 'always'],
-    'comma-dangle': ['error', 'always-multiline'],
-    'object-curly-spacing': ['error', 'always'],
-    'array-bracket-spacing': ['error', 'never'],
-    
-    // Best practices
-    'eqeqeq': ['error', 'always'],
-    'curly': ['error', 'all'],
+    'no-alert': 'error',
     'no-eval': 'error',
     'no-implied-eval': 'error',
     'no-new-func': 'error',
     'no-script-url': 'error',
+    'prefer-const': 'error',
+    'no-var': 'error',
+    'object-shorthand': 'error',
+    'prefer-template': 'error',
+    'prefer-arrow-callback': 'error',
+    'arrow-spacing': 'error',
+    'no-duplicate-imports': 'error',
+    'no-useless-rename': 'error',
+    'object-curly-spacing': ['error', 'always'],
+    'array-bracket-spacing': ['error', 'never'],
+    'comma-dangle': ['error', 'always-multiline'],
+    'semi': ['error', 'always'],
+    'quotes': ['error', 'single', { avoidEscape: true }],
+    'indent': ['error', 2, { SwitchCase: 1 }],
+    'max-len': ['warn', { code: 100, ignoreUrls: true, ignoreStrings: true }],
+    'no-trailing-spaces': 'error',
+    'eol-last': 'error',
+    'no-multiple-empty-lines': ['error', { max: 1, maxEOF: 0 }],
+    'padding-line-between-statements': [
+      'error',
+      { blankLine: 'always', prev: '*', next: 'return' },
+      { blankLine: 'always', prev: ['const', 'let', 'var'], next: '*' },
+      { blankLine: 'any', prev: ['const', 'let', 'var'], next: ['const', 'let', 'var'] },
+    ],
   },
-  env: {
-    node: true,
-    es6: true,
-    jest: true,
-  },
-  ignorePatterns: [
-    'dist/',
-    'coverage/',
-    'node_modules/',
-    'worker-configuration.d.ts',
+  overrides: [
+    {
+      files: ['tests/**/*.ts'],
+      env: {
+        jest: true,
+      },
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'warn', // Allow any in tests for mocking
+        'no-console': 'off', // Allow console in tests
+      },
+    },
+    {
+      files: ['*.config.js', '*.config.ts'],
+      env: {
+        node: true,
+      },
+      rules: {
+        '@typescript-eslint/no-var-requires': 'off',
+      },
+    },
   ],
 }; 

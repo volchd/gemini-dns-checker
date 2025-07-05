@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    "ms-vscode.vscode-typescript-next",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "ms-vscode.vscode-json",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-jest",
+    "cloudflare.cloudflare",
+    "ms-vscode.vscode-git-graph",
+    "eamodio.gitlens",
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+    "ms-vscode.vscode-markdown-all-in-one"
+  ]
+} 
