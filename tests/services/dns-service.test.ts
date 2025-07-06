@@ -40,7 +40,7 @@ describe('DNS Service', () => {
       });
 
       expect(fetch).toHaveBeenCalledWith(
-        `${testConfig.dns.dohUrl}?name=example.com&type=A`,
+        `${testConfig.dns.dohUrls[0]}?name=example.com&type=A`,
         expect.objectContaining({
           headers: { Accept: 'application/dns-json' }
         })
@@ -137,7 +137,7 @@ describe('DNS Service', () => {
       await queryDnsRecord('example.com', 'TXT', testConfig);
 
       expect(fetch).toHaveBeenCalledWith(
-        `${testConfig.dns.dohUrl}?name=example.com&type=TXT`,
+        `${testConfig.dns.dohUrls[0]}?name=example.com&type=TXT`,
         expect.any(Object)
       );
     });

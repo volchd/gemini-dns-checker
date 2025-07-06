@@ -47,7 +47,7 @@ describe('SPF Service', () => {
       });
 
       expect(fetch).toHaveBeenCalledWith(
-        `${testConfig.dns.dohUrl}?name=example.com&type=TXT`,
+        `${testConfig.dns.dohUrls[0]}?name=example.com&type=TXT`,
         expect.objectContaining({
           headers: { Accept: 'application/dns-json' }
         })

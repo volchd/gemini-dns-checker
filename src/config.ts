@@ -1,6 +1,6 @@
 export interface AppConfig {
   dns: {
-    dohUrl: string;
+    dohUrls: string[];
     timeout: number;
     retries: number;
   };
@@ -24,7 +24,11 @@ export interface AppConfig {
 
 const defaultConfig: AppConfig = {
   dns: {
-    dohUrl: "https://cloudflare-dns.com/dns-query",
+    dohUrls: [
+      "https://dns.google/resolve",
+      "https://cloudflare-dns.com/dns-query",
+      "https://unfiltered.adguard-dns.com/resolve"
+    ],
     timeout: 10000, // 10 seconds
     retries: 3
   },
@@ -48,11 +52,26 @@ const defaultConfig: AppConfig = {
 
 export function getConfig(env?: Record<string, string>): AppConfig {
   // In Cloudflare Workers, environment variables are passed via the env parameter
+  
+  // Parse DoH URLs from environment variable
+  let dohUrls = defaultConfig.dns.dohUrls;
+  if (env?.DOH_URLS) {
+    dohUrls = env.DOH_URLS.split(',').map(url => url.trim()).filter(url => url.length > 0);
+  } else if (env?.DOH_URL) {
+    // Backward compatibility: single DoH URL
+    dohUrls = [env.DOH_URL];
+  }
+  
+  // Ensure we have at least one DoH URL
+  if (dohUrls.length === 0) {
+    dohUrls = defaultConfig.dns.dohUrls;
+  }
+
   return {
     ...defaultConfig,
     dns: {
       ...defaultConfig.dns,
-      dohUrl: env?.DOH_URL || defaultConfig.dns.dohUrl,
+      dohUrls,
       timeout: parseInt(env?.DNS_TIMEOUT || defaultConfig.dns.timeout.toString()),
       retries: parseInt(env?.DNS_RETRIES || defaultConfig.dns.retries.toString())
     },
@@ -66,4 +85,4 @@ export function getConfig(env?: Record<string, string>): AppConfig {
 export const config = getConfig();
 
 // Legacy export for backward compatibility
-export const dohUrl = config.dns.dohUrl;
+export const dohUrl = config.dns.dohUrls[0];

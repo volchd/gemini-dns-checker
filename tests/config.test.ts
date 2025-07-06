@@ -28,7 +28,7 @@ describe('Configuration', () => {
       const config = getConfig();
       
       // DNS section
-      expect(config.dns).toHaveProperty('dohUrl');
+      expect(config.dns).toHaveProperty('dohUrls');
       expect(config.dns).toHaveProperty('timeout');
       expect(config.dns).toHaveProperty('retries');
       
@@ -52,7 +52,7 @@ describe('Configuration', () => {
       const config = getConfig();
       
       // DNS defaults
-      expect(config.dns.dohUrl).toBe('https://cloudflare-dns.com/dns-query');
+      expect(config.dns.dohUrls).toEqual(['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query']);
       expect(config.dns.timeout).toBe(10000);
       expect(config.dns.retries).toBe(3);
       
@@ -89,7 +89,7 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrl).toBe('https://custom-dns.example.com/dns-query');
+      expect(config.dns.dohUrls).toEqual(['https://custom-dns.example.com/dns-query']);
       expect(config.dns.timeout).toBe(5000);
       expect(config.dns.retries).toBe(5);
     });
@@ -127,7 +127,7 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrl).toBe('https://custom-dns.example.com/dns-query');
+      expect(config.dns.dohUrls).toEqual(['https://custom-dns.example.com/dns-query']);
       expect(config.dns.timeout).toBe(10000); // default
       expect(config.dns.retries).toBe(3); // default
     });
@@ -156,7 +156,7 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrl).toBe('https://cloudflare-dns.com/dns-query'); // default
+      expect(config.dns.dohUrls).toEqual(['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query']); // default
       expect(config.dns.timeout).toBe(15000); // overridden
       expect(config.dns.retries).toBe(3); // default
     });
@@ -280,7 +280,7 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrl).toBe('https://cloudflare-dns.com/dns-query'); // Falls back to default
+      expect(config.dns.dohUrls).toEqual(['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query']); // Falls back to default
       expect(config.dns.timeout).toBe(10000); // Falls back to default, then parsed as valid number
       expect(config.dns.retries).toBe(3); // Falls back to default, then parsed as valid number
       expect(config.logging.level).toBe('info'); // Falls back to default
@@ -292,7 +292,7 @@ describe('Configuration', () => {
       const config: AppConfig = getConfig();
       
       // TypeScript should enforce these types
-      expect(typeof config.dns.dohUrl).toBe('string');
+      expect(typeof config.dns.dohUrls[0]).toBe('string');
       expect(typeof config.dns.timeout).toBe('number');
       expect(typeof config.dns.retries).toBe('number');
       
@@ -334,7 +334,7 @@ describe('Configuration', () => {
       
       const config = getConfig(prodEnv);
       
-      expect(config.dns.dohUrl).toBe('https://1.1.1.1/dns-query');
+      expect(config.dns.dohUrls).toEqual(['https://1.1.1.1/dns-query']);
       expect(config.dns.timeout).toBe(30000);
       expect(config.dns.retries).toBe(5);
       expect(config.logging.level).toBe('warn');
@@ -348,7 +348,7 @@ describe('Configuration', () => {
       
       const config = getConfig(devEnv);
       
-      expect(config.dns.dohUrl).toBe('https://cloudflare-dns.com/dns-query'); // default
+      expect(config.dns.dohUrls).toEqual(['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query']); // default
       expect(config.dns.timeout).toBe(5000);
       expect(config.dns.retries).toBe(3); // default
       expect(config.logging.level).toBe('debug');
@@ -364,7 +364,7 @@ describe('Configuration', () => {
       
       const config = getConfig(workersEnv);
       
-      expect(config.dns.dohUrl).toBe('https://cloudflare-dns.com/dns-query');
+      expect(config.dns.dohUrls).toEqual(['https://cloudflare-dns.com/dns-query']);
       expect(config.dns.timeout).toBe(10000);
       expect(config.dns.retries).toBe(3);
       expect(config.logging.level).toBe('info');
@@ -378,7 +378,7 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrl).toBe(longUrl);
+      expect(config.dns.dohUrls).toEqual([longUrl]);
     });
 
     it('should handle special characters in URL', () => {
@@ -387,7 +387,7 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrl).toBe(specialUrl);
+      expect(config.dns.dohUrls).toEqual([specialUrl]);
     });
 
     it('should handle whitespace in values', () => {
@@ -399,7 +399,7 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrl).toBe('  https://dns.example.com/dns-query  ');
+      expect(config.dns.dohUrls).toEqual(['  https://dns.example.com/dns-query  ']);
       expect(config.dns.timeout).toBe(5000); // parseInt handles whitespace
       expect(config.logging.level).toBe('  debug  ');
     });

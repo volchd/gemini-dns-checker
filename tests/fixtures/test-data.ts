@@ -70,7 +70,7 @@ export const MOCK_SPF_RECORDS = {
 
 export const TEST_CONFIG = {
   dns: {
-    dohUrl: "https://test-dns.com/dns-query",
+    dohUrls: ["https://test-dns.com/dns-query"],
     timeout: 5000,
     retries: 2
   },

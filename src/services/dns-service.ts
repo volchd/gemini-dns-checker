@@ -1,6 +1,7 @@
 import { DnsResponse } from "../types";
 import { AppConfig } from "../config";
 import { logger } from "../utils/logger";
+import { getRandomDohUrl } from "./doh-balancer";
 
 export interface DnsQueryOptions {
   recordType?: string;
@@ -26,11 +27,13 @@ export interface DnsQueryResult {
 async function performDnsQuery(domain: string, options: DnsQueryOptions = {}, config: AppConfig): Promise<DnsResponse> {
   const { recordType = 'A', timeout = config.dns.timeout, retries = config.dns.retries } = options;
   
-  const url = `${config.dns.dohUrl}?name=${encodeURIComponent(domain)}&type=${recordType}`;
-  
+  const dohUrl = getRandomDohUrl(config);
+  logger.info(`Using DoH URL: ${dohUrl}`);
+  const url = `${dohUrl}?name=${encodeURIComponent(domain)}&type=${recordType}`;
+  logger.info(`DNS query URL: ${url}`);
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      logger.debug(`DNS query attempt ${attempt}/${retries} for ${domain}`, { domain, recordType, attempt });
+      logger.debug(`DNS query attempt ${attempt}/${retries} for ${domain}`, { domain, recordType, attempt, url });
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -38,6 +41,7 @@ async function performDnsQuery(domain: string, options: DnsQueryOptions = {}, co
       const response = await fetch(url, {
         headers: {
           Accept: "application/dns-json",
+          "User-Agent": "Mozilla/5.0 (compatible; GeminiDNSChecker/1.0)",
         },
         signal: controller.signal,
       });

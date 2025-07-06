@@ -1,5 +1,7 @@
 import { DnsResponse, SpfRecordObject } from "../types";
 import { AppConfig } from "../config";
+import { logger } from "../utils/logger";
+import { queryDnsRecord } from "./dns-service";
 
 /**
  * Recursively fetches SPF records for a given domain and its included/redirected domains.
@@ -14,33 +16,18 @@ import { AppConfig } from "../config";
 export async function getSpfRecord(domain: string, visitedDomains: Set<string> = new Set(), recordType: 'initial' | 'include' | 'redirect' = 'initial', config: AppConfig): Promise<SpfRecordObject[]> {
 	// Check for circular dependencies to prevent infinite loops.
 	if (visitedDomains.has(domain)) {
-		console.log(`Circular dependency detected for domain: ${domain}. Skipping.`);
+		logger.warn(`Circular dependency detected for domain: ${domain}. Skipping.`, { domain });
 		return [];
 	}
 	// Add the current domain to the set of visited domains.
 	visitedDomains.add(domain);
 
-	console.log(`Performing SPF record lookup for domain: ${domain}`);
-	// Construct the DoH URL for TXT records.
-	const url = `${config.dns.dohUrl}?name=${encodeURIComponent(domain)}&type=TXT`;
+	logger.debug(`Performing SPF record lookup for domain: ${domain}`, { domain, recordType });
 
 	try {
-		// Make a fetch request to the DoH service for TXT records.
-		const response = await fetch(url, {
-			headers: {
-				Accept: "application/dns-json", // Request DNS-JSON format
-			},
-		});
-
-		// If the HTTP response is not OK, log an error and throw.
-		if (!response.ok) {
-			console.error(`DoH query for TXT records failed with status: ${response.status}`);
-			throw new Error("DNS TXT query failed");
-		}
-
-		// Parse the JSON response from the DoH service.
-		const dnsResponse: DnsResponse = await response.json();
-		//console.log(`DoH TXT response for ${domain}:`, dnsResponse);
+		// Use the robust DNS service for TXT record queries
+		const dnsResponse: DnsResponse = await queryDnsRecord(domain, 'TXT', config);
+		logger.debug(`DNS TXT query successful for ${domain}`, { domain, status: dnsResponse.Status });
 
 		const spfRecords: SpfRecordObject[] = [];
 		// Check if there are any answers in the DNS response.
@@ -50,15 +37,15 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 				// Check if the record is a TXT record (type 16) and starts with "v=spf1".
 				if (record.type === 16 && record.data.replace(/"/g, '').startsWith("v=spf1")) { // Type 16 is TXT
 					let spfRecord = record.data;
-					console.log(`DoH TXT response for ${domain}:`, record);
-										spfRecords.push({ domain, spfRecord, type: recordType });
+					logger.debug(`Found SPF record for ${domain}:`, { domain, spfRecord, type: recordType });
+					spfRecords.push({ domain, spfRecord, type: recordType });
 
 					// Handle 'include' mechanisms: recursively fetch SPF records for included domains.
 					const includeRegex = /include:([\w.-]+)/g;
 					let match;
 					while ((match = includeRegex.exec(spfRecord)) !== null) {
 						const includedDomain = match[1];
-						console.log(`Found include mechanism for domain: ${includedDomain}`);
+						logger.debug(`Found include mechanism for domain: ${includedDomain}`, { includedDomain, parentDomain: domain });
 						const includedSpfRecords = await getSpfRecord(includedDomain, visitedDomains, 'include', config);
 						spfRecords.push(...includedSpfRecords);
 					}
@@ -68,7 +55,7 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 					match = redirectRegex.exec(spfRecord);
 					if (match) {
 						const redirectedDomain = match[1];
-						console.log(`Found redirect mechanism for domain: ${redirectedDomain}`);
+						logger.debug(`Found redirect mechanism for domain: ${redirectedDomain}`, { redirectedDomain, parentDomain: domain });
 						const redirectedSpfRecords = await getSpfRecord(redirectedDomain, visitedDomains, 'redirect', config);
 						spfRecords.push(...redirectedSpfRecords);
 					}
@@ -77,8 +64,8 @@ export async function getSpfRecord(domain: string, visitedDomains: Set<string> =
 		}
 		return spfRecords;
 	} catch (error) {
-		// Catch and re-throw any errors that occur during the fetch operation.
-		console.error("DoH TXT request failed:", error);
-		throw new Error("DNS TXT query failed");
+		// Log the error with context and re-throw
+		logger.error(`SPF record lookup failed for domain: ${domain}`, error as Error, { domain, recordType });
+		throw new Error(`DNS TXT query failed for domain ${domain}: ${error instanceof Error ? error.message : 'Unknown error'}`);
 	}
 }
