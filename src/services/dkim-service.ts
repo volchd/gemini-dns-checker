@@ -23,21 +23,25 @@ export class DkimService implements IDkimService {
     }
 
     async getDkimRecords(domain: string): Promise<DkimRecordSet> {
+        logger.debug(`Getting DKIM records for domain: ${domain}`);
         const selectors = await this.discoverSelectors(domain);
         const records: DkimRecord[] = [];
 
         await Promise.all(
             selectors.map(async (selector) => {
                 try {
+                    logger.debug(`Fetching DKIM record for selector: ${selector}, domain: ${domain}`);
                     const record = await this.getDkimRecord(domain, selector);
                     records.push(record);
+                    logger.debug(`Fetched DKIM record for selector: ${selector}, domain: ${domain}`);
                 } catch (error) {
                     // Skip failed records but continue processing others
-                    console.error(`Failed to fetch DKIM record for selector ${selector}:`, error);
+                    logger.error(`Failed to fetch DKIM record for selector ${selector}: ${(error instanceof Error ? error.message : String(error))}`);
                 }
             })
         );
 
+        logger.debug(`Returning DKIM records for domain: ${domain}, count: ${records.length}`);
         return {
             domain,
             records,
@@ -46,30 +50,39 @@ export class DkimService implements IDkimService {
     }
 
     async getDkimRecord(domain: string, selector: string): Promise<DkimRecord> {
+        logger.debug(`Getting DKIM record for domain: ${domain}, selector: ${selector}`);
         const dkimDomain = this.getDkimDomain(selector, domain);
+        logger.debug(`Querying TXT records for DKIM domain: ${dkimDomain}`);
         const txtRecords = await this.dnsService.queryTxt(dkimDomain);
 
         if (!txtRecords || txtRecords.length === 0) {
+            logger.debug(`No DKIM TXT records found for ${dkimDomain}`);
             throw new Error(`No DKIM record found for ${dkimDomain}`);
         }
 
         // DKIM should be a single TXT record
         const rawRecord = txtRecords[0];
+        logger.debug(`Found DKIM TXT record for ${dkimDomain}: ${rawRecord}`);
+
+        const parsedData = this.parseDkimRecord(rawRecord);
+        logger.debug(`Parsed DKIM record for ${dkimDomain}:`, parsedData);
 
         return {
             domain,
             selector,
             rawRecord,
-            parsedData: this.parseDkimRecord(rawRecord),
+            parsedData,
             retrievedAt: new Date()
         };
     }
 
     async validateDkimRecords(domain: string): Promise<DkimValidationResult> {
+        logger.debug(`Validating DKIM records for domain: ${domain}`);
         const recordSet = await this.getDkimRecords(domain);
         const domainIssues: DkimValidationIssue[] = [];
         const validatedRecords = await Promise.all(
             recordSet.records.map(async (record) => {
+                logger.debug(`Validating DKIM record for selector: ${record.selector}`);
                 const checks = {
                     hasValidSelector: true,
                     hasValidVersion: record.parsedData.version === 'DKIM1',
@@ -104,6 +117,7 @@ export class DkimService implements IDkimService {
                     });
                 }
 
+                logger.debug(`Validation result for selector ${record.selector}:`, { checks, issues });
                 return {
                     selector: record.selector,
                     isValid: Object.values(checks).every(Boolean),
@@ -121,6 +135,7 @@ export class DkimService implements IDkimService {
             });
         }
 
+        logger.debug(`Validation summary for domain ${domain}:`, { validatedRecords, domainIssues });
         return {
             domain,
             isValid: validatedRecords.some(r => r.isValid) && domainIssues.length === 0,
@@ -130,13 +145,14 @@ export class DkimService implements IDkimService {
     }
 
     async discoverSelectors(domain: string): Promise<string[]> {
+        logger.debug(`Discovering DKIM selectors for domain: ${domain}`);
         // Check cache first
         const cacheKey = `selectors:${domain}`;
         const cached = this.selectorCache.get(cacheKey);
         const now = Date.now();
         
         if (cached && (now - cached.timestamp) < this.cacheTTL) {
-            logger.info(`Using cached selectors for domain: ${domain}`);
+            logger.debug(`Using cached selectors for domain: ${domain}`);
             return cached.selectors;
         }
 
@@ -144,12 +160,13 @@ export class DkimService implements IDkimService {
         await Promise.all(
             config.dkim.commonSelectors.map(async (selector) => {
                 const dkimDomain = this.getDkimDomain(selector, domain);
-                logger.info(`Discovering DKIM selector: ${dkimDomain}`);
+                logger.debug(`Checking DKIM selector: ${selector} for domain: ${domain} (FQDN: ${dkimDomain})`);
                 try {
                     const records = await this.dnsService.queryTxt(dkimDomain);
-                    logger.info(`Discovered DKIM selector: ${records}`);
+                    logger.debug(`DNS TXT query for ${dkimDomain} returned:`, records);
                     if (records && records.length > 0) {
                         discoveredSelectors.push(selector);
+                        logger.debug(`Selector ${selector} is valid for domain: ${domain}`);
                     }
                 } catch (error) {
                     logger.error(
@@ -166,11 +183,13 @@ export class DkimService implements IDkimService {
             selectors: discoveredSelectors,
             timestamp: now
         });
+        logger.debug(`Discovered selectors for domain ${domain}:`, discoveredSelectors);
 
         return discoveredSelectors;
     }
 
     parseDkimRecord(record: string): DkimRecord['parsedData'] {
+        logger.debug(`Parsing DKIM record: ${record}`);
         // Split on semicolons, ignoring those inside quotes (rare, but RFC-compliant)
         const tagPairs = record.match(/(?:[^;"']|"[^"]*"|'[^']*')+/g) || [];
         const parsedData: DkimRecord['parsedData'] = {
@@ -194,7 +213,7 @@ export class DkimService implements IDkimService {
         }
         const hasVTag = tagPairs.some(pair => pair.trim().startsWith('v='));
         if (hasVTag && firstTagKey !== 'v') {
-            // You can throw, log, or set a flag. Here, we throw:
+            logger.error(`If present, the 'v' tag must be the first tag in the DKIM record (RFC 6376 3.6.1). Record: ${record}`);
             throw new Error("If present, the 'v' tag must be the first tag in the DKIM record (RFC 6376 3.6.1).");
         }
 
@@ -218,6 +237,7 @@ export class DkimService implements IDkimService {
         if ('t' in tagMap) parsedData.flags = tagMap['t'].split(':').map(f => f.trim()).filter(Boolean);
         if ('n' in tagMap) parsedData.notes = tagMap['n'];
 
+        logger.debug(`Parsed DKIM record data:`, parsedData);
         return parsedData;
     }
 } 
