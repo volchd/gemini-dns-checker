@@ -69,10 +69,22 @@ interface DkimValidationResult {
 ### 3. Controller Implementation
 - Create `dkim-controller.ts` in `src/controllers/`
 - Implement REST endpoints:
-  - GET `/api/dkim/:domain` - Get all DKIM records
-  - GET `/api/dkim/:domain/:selector` - Get specific DKIM record
-  - GET `/api/dkim/:domain/validate` - Validate all records
-  - GET `/api/dkim/:domain/selectors` - Discover selectors
+  - GET `/api/dkim?domain=example.com` - Get all DKIM records for a domain
+  - GET `/api/dkim/record?domain=example.com&selector=default` - Get specific DKIM record
+  - GET `/api/dkim/validate?domain=example.com` - Validate all records for a domain
+  - GET `/api/dkim/selectors?domain=example.com` - Discover selectors for a domain
+
+All endpoints:
+- Return JSON responses with standardized fields:
+  - requestId: UUID for request tracking
+  - responseTime: Processing time in milliseconds
+  - timestamp: ISO 8601 timestamp
+- Include proper error handling:
+  - 400: Missing or invalid parameters
+  - 504: Request timeout
+  - 500: Internal server error
+- Follow CORS policy from configuration
+- Include comprehensive logging
 
 ### 4. Integration with Existing Services
 - Integrate with `dns-service.ts` for DNS lookups
