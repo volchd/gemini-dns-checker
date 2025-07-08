@@ -103,6 +103,22 @@ export interface DkimValidationResult {
     domainIssues: DkimValidationIssue[];
 }
 
+export interface DkimScoreItem {
+    name: string;
+    description: string;
+    score: number;
+    maxScore: number;
+    passed: boolean;
+    details?: string;
+}
+
+export interface DkimScoringResults {
+    totalScore: number;
+    maxPossibleScore: number;
+    percentage: number;
+    scoreItems: DkimScoreItem[];
+}
+
 export interface IDkimService {
     getDkimRecords(domain: string): Promise<DkimRecordSet>;
     getDkimRecord(domain: string, selector: string): Promise<DkimRecord>;

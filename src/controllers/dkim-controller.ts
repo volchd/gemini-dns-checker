@@ -2,6 +2,7 @@ import { Context } from "hono";
 import { IDkimService } from "../types";
 import { DomainValidator, ValidationError } from "../utils/validation";
 import { logger } from "../utils/logger";
+import { DkimScorer } from "../services/dkim-scorer";
 
 export class DkimController {
     constructor(private dkimService: IDkimService) {}
@@ -52,7 +53,9 @@ export class DkimController {
             });
 
             const records = await this.dkimService.getDkimRecords(sanitizedDomain);
-            
+            // Calculate DKIM score
+            const scorer = new DkimScorer();
+            const score = await scorer.calculateScore(records);
             const responseTime = Date.now() - startTime;
             
             logger.info(`DKIM records fetch completed successfully`, { 
@@ -64,6 +67,7 @@ export class DkimController {
 
             return c.json({
                 ...records,
+                score,
                 requestId,
                 responseTime,
                 timestamp: new Date().toISOString()
@@ -257,88 +261,4 @@ export class DkimController {
             }, statusCode);
         }
     }
-
-    async discoverSelectors(c: Context): Promise<Response> {
-        const startTime = Date.now();
-        const requestId = crypto.randomUUID();
-        
-        logger.info(`DKIM selector discovery request received`, { 
-            requestId, 
-            endpoint: '/dkim/selectors',
-            userAgent: c.req.header('User-Agent') 
-        });
-
-        try {
-            const domain = c.req.query('domain');
-            
-            if (!domain) {
-                logger.warn(`DKIM selector discovery request missing domain parameter`, { requestId });
-                return c.json({ 
-                    error: "Domain parameter is required",
-                    requestId 
-                }, 400);
-            }
-
-            // Validate and sanitize the domain
-            try {
-                DomainValidator.validate(domain);
-            } catch (validationError) {
-                const error = validationError as ValidationError;
-                logger.warn(`DKIM selector discovery request with invalid domain`, { 
-                    requestId, 
-                    domain, 
-                    error: error.message 
-                });
-                return c.json({ 
-                    error: error.message,
-                    field: error.field,
-                    requestId 
-                }, 400);
-            }
-
-            const sanitizedDomain = DomainValidator.sanitize(domain);
-            
-            logger.info(`Starting DKIM selector discovery`, { 
-                requestId, 
-                domain: sanitizedDomain 
-            });
-
-            const selectors = await this.dkimService.discoverSelectors(sanitizedDomain);
-            
-            const responseTime = Date.now() - startTime;
-            
-            logger.info(`DKIM selector discovery completed successfully`, { 
-                requestId, 
-                domain: sanitizedDomain,
-                selectorCount: selectors.length,
-                responseTime 
-            });
-
-            return c.json({
-                domain: sanitizedDomain,
-                selectors,
-                requestId,
-                responseTime,
-                timestamp: new Date().toISOString()
-            });
-
-        } catch (error) {
-            const responseTime = Date.now() - startTime;
-            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-            
-            logger.error(`DKIM selector discovery failed`, error as Error, { 
-                requestId, 
-                responseTime 
-            });
-
-            const statusCode = error instanceof Error && error.message.includes('timeout') ? 504 : 500;
-            
-            return c.json({ 
-                error: errorMessage,
-                requestId,
-                responseTime,
-                timestamp: new Date().toISOString()
-            }, statusCode);
-        }
-    }
-} 
+}

@@ -240,4 +240,93 @@ export class DkimService implements IDkimService {
         logger.debug(`Parsed DKIM record data:`, parsedData);
         return parsedData;
     }
+
+    /**
+     * Scores DKIM configuration for a domain.
+     * Returns total score and breakdown.
+     */
+    async scoreDkim(domain: string): Promise<{
+        total: number;
+        breakdown: {
+            implemented: number;
+            keyLength: number;
+            multipleSelectors: number;
+            noTestMode: number;
+            keyLengths: { selector: string; bits: number | null }[];
+            testModeSelectors: string[];
+        };
+    }> {
+        const recordSet = await this.getDkimRecords(domain);
+        const records = recordSet.records;
+
+        // 1. DKIM Implemented
+        const implemented = records.length > 0 ? 10 : 0;
+
+        // 2. DKIM Key Length
+        let keyLengthScore = 0;
+        let maxKeyLength = 0;
+        let hasWeakKey = false;
+        const keyLengths: { selector: string; bits: number | null }[] = [];
+
+        for (const record of records) {
+            let bits: number | null = null;
+            try {
+                if (record.parsedData.publicKey) {
+                    // Remove whitespace from base64
+                    const keyData = record.parsedData.publicKey.replace(/\s+/g, '');
+                    // Decode base64 to binary
+                    const binary = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
+                    // Try to import as RSA key
+                    const cryptoKey = await crypto.subtle.importKey(
+                        'spki',
+                        binary.buffer,
+                        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+                        false,
+                        ['verify']
+                    );
+                    // @ts-ignore: modulusLength is not standard, but may be present in Workers
+                    bits = cryptoKey.algorithm.modulusLength || null;
+                }
+            } catch {
+                bits = null;
+            }
+            keyLengths.push({ selector: record.selector, bits });
+            if (bits !== null) {
+                if (bits < 1024) hasWeakKey = true;
+                if (bits > maxKeyLength) maxKeyLength = bits;
+            }
+        }
+
+        if (hasWeakKey) {
+            keyLengthScore = 0; // or 1 if you want to be lenient
+        } else if (maxKeyLength >= 2048) {
+            keyLengthScore = 5;
+        } else if (maxKeyLength >= 1024) {
+            keyLengthScore = 3;
+        }
+
+        // 3. Multiple Selectors
+        const multipleSelectors = records.length >= 2 ? 3 : 0;
+
+        // 4. No DKIM Test Mode
+        const testModeSelectors = records
+            .filter(r => Array.isArray(r.parsedData.flags) && r.parsedData.flags.includes('y'))
+            .map(r => r.selector);
+        const noTestMode = testModeSelectors.length === 0 ? 2 : 0;
+
+        // Total
+        const total = implemented + keyLengthScore + multipleSelectors + noTestMode;
+
+        return {
+            total,
+            breakdown: {
+                implemented,
+                keyLength: keyLengthScore,
+                multipleSelectors,
+                noTestMode,
+                keyLengths,
+                testModeSelectors
+            }
+        };
+    }
 } 

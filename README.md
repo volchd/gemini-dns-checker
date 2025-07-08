@@ -130,6 +130,76 @@ GET /api/dkim/selectors?domain=example.com
 ```
 DKIM record management and validation endpoints.
 
+**Response for /api/dkim?domain=example.com:**
+```json
+{
+  "domain": "example.com",
+  "records": [
+    {
+      "domain": "example.com",
+      "selector": "default",
+      "rawRecord": "v=DKIM1; k=rsa; p=...",
+      "parsedData": {
+        "version": "DKIM1",
+        "algorithm": "rsa-sha256",
+        "keyType": "rsa",
+        "publicKey": "...",
+        "serviceType": "email",
+        "flags": [],
+        "notes": ""
+      },
+      "retrievedAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "retrievedAt": "2024-01-01T00:00:00.000Z",
+  "score": {
+    "totalScore": 20,
+    "maxPossibleScore": 20,
+    "percentage": 100,
+    "scoreItems": [
+      {
+        "name": "DKIM Implemented",
+        "description": "At least one DKIM public key record is published for the domain.",
+        "score": 10,
+        "maxScore": 10,
+        "passed": true,
+        "details": "Found 1 DKIM record(s)"
+      },
+      {
+        "name": "DKIM Key Length",
+        "description": "Strength of DKIM keys in DNS: 2048-bit (or higher): 5 points. 1024-bit: 3 points. <1024-bit: 0.",
+        "score": 5,
+        "maxScore": 5,
+        "passed": true,
+        "details": "default: 2048 bits"
+      },
+      {
+        "name": "DKIM Multiple Selectors",
+        "description": "Domain has at least two DKIM selectors/keys set up (facilitates key rotation).",
+        "score": 0,
+        "maxScore": 3,
+        "passed": false,
+        "details": "Only one selector found"
+      },
+      {
+        "name": "No DKIM Test Mode",
+        "description": "DKIM DNS records are in normal mode (no t=y flags set, indicating no lingering test-mode).",
+        "score": 2,
+        "maxScore": 2,
+        "passed": true,
+        "details": "No test mode flags found"
+      }
+    ]
+  },
+  "requestId": "uuid",
+  "responseTime": 250,
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+- The `score` object provides a detailed breakdown of DKIM configuration quality, including key length, selector count, and test mode status.
+- Scoring is based on best practices for DKIM security and compliance.
+
 **Response for /api/dkim/validate:**
 ```json
 {
