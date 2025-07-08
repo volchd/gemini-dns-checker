@@ -1,6 +1,7 @@
 import { SpfRecordObject, SpfValidationResults } from "../types";
 import { SpfScorer } from "./spf-scorer";
 import ipaddr from 'ipaddr.js';
+import { logger } from "../utils/logger";
 
 /**
  * Validates the syntax of a single SPF record string.
@@ -12,12 +13,15 @@ class SyntaxValidator {
      * @returns An object indicating validity and a list of errors if any.
      */
     validate(record: string): { isValid: boolean; errors: string[] } {
+        logger.debug(`Validating SPF record syntax: ${record}`);
         const errors: string[] = [];
         // Split the record into terms and filter out empty strings.
         const terms = record.split(' ').filter(term => term.length > 0);
+        logger.debug(`SPF terms to validate: ${terms.join(', ')}`);
 
         // Check if the record starts with "v=spf1".
         if (terms.length === 0 || terms[0].toLowerCase() !== 'v=spf1') {
+            logger.debug('SPF validation failed: Missing or invalid version');
             errors.push('Record must start with "v=spf1"');
         }
 
@@ -25,6 +29,7 @@ class SyntaxValidator {
         if (terms.length > 1) {
             const lastTerm = terms[terms.length - 1];
             if (!lastTerm.includes('all') && !lastTerm.startsWith('redirect=')) {
+                logger.debug(`SPF validation failed: Invalid last term "${lastTerm}"`);
                 errors.push('Record must end with an "all" mechanism or a "redirect" modifier');
             }
         }
@@ -33,16 +38,20 @@ class SyntaxValidator {
         const mechanisms = terms.slice(1);
         // Ensure there is at least one mechanism or modifier.
         if (mechanisms.length === 0) {
+            logger.debug('SPF validation failed: No mechanisms found');
             errors.push('Record must contain at least one mechanism or modifier');
         }
 
         // Validate each term individually.
         for (const term of mechanisms) {
+            logger.debug(`Validating SPF term: ${term}`);
             this.validateTerm(term, errors);
         }
 
         // Return validity status and collected errors.
-        return { isValid: errors.length === 0, errors };
+        const isValid = errors.length === 0;
+        logger.debug(`SPF syntax validation complete. Valid: ${isValid}, Errors: ${errors.length}`);
+        return { isValid, errors };
     }
 
     /**
@@ -88,16 +97,21 @@ class SyntaxValidator {
      * @param errors The array to push validation errors into.
      */
     private validateMechanism(name: string, value: string | undefined, errors: string[]): void {
+        logger.debug(`Validating SPF mechanism: ${name}${value ? `:${value}` : ''}`);
+        
         // Check if mechanisms requiring a value have one.
         if (['include', 'exists'].includes(name) && !value) {
+            logger.debug(`SPF mechanism "${name}" missing required value`);
             errors.push(`Mechanism "${name}" requires a value`);
         }
         // Validate IPv4 address format for "ip4" mechanism.
         if (name === 'ip4' && value && !this.isValidIp4(value)) {
+            logger.debug(`Invalid IPv4 address in SPF: ${value}`);
             errors.push(`Invalid IPv4 address for "ip4": ${value}`);
         }
         // Validate IPv6 address format for "ip6" mechanism.
         if (name === 'ip6' && value && !this.isValidateIp6(value)) {
+            logger.debug(`Invalid IPv6 address in SPF: ${value}`);
             errors.push(`Invalid IPv6 address for "ip6": ${value}`);
         }
     }
@@ -191,6 +205,8 @@ export class SpfValidator {
      * @returns An array of validation results, including messages for issues found.
      */
     validate(spfRecords: SpfRecordObject[]): SpfValidationResults {
+        logger.debug(`Starting SPF validation for ${spfRecords.length} records`);
+        
         const results: SpfValidationResults = {
             hasSpfRecord: { isValid: false },
             syntaxValidation: { isValid: false, errors: [] },
@@ -203,17 +219,19 @@ export class SpfValidator {
 
         // Concatenate split SPF records before validation
         spfRecords.forEach(record => {
+            logger.debug(`Processing SPF record for domain: ${record.domain}, type: ${record.type}`);
             record.spfRecord = this.concatenateSpfRecordString(record.spfRecord);
         });
 
-        console.log("Concatenated SPF records:", spfRecords.map(r => r.spfRecord));
+        logger.debug("Concatenated SPF records:", spfRecords.map(r => ({ domain: r.domain, record: r.spfRecord })));
 
         // 1. Check if any SPF record exists.
         const hasRecord = this.hasSpfRecord(spfRecords);
         results.hasSpfRecord.isValid = hasRecord;
+        logger.debug(`SPF record existence check: ${hasRecord}`);
         if (!hasRecord) {
             results.hasSpfRecord.message = "No SPF record found.";
-            // If no SPF record, no further validation can be performed.
+            logger.debug("Validation stopped: No SPF records found");
             return results;
         }
 
@@ -221,10 +239,12 @@ export class SpfValidator {
         const syntaxErrors = this.validateSpfSyntax(spfRecords);
         results.syntaxValidation.isValid = syntaxErrors.length === 0;
         results.syntaxValidation.errors = syntaxErrors;
+        logger.debug(`SPF syntax validation complete. Valid: ${results.syntaxValidation.isValid}, Errors: ${syntaxErrors.length}`);
 
         // 3. Check for exactly one initial SPF record.
         const hasOneInitial = this.hasOneInitialSpfRecord(spfRecords);
         results.oneInitialSpfRecord.isValid = hasOneInitial;
+        logger.debug(`Single initial SPF record check: ${hasOneInitial}`);
         if (!hasOneInitial) {
             results.oneInitialSpfRecord.message = "There should be exactly one initial SPF record.";
         }
@@ -232,6 +252,7 @@ export class SpfValidator {
         // 4. Check for the maximum number of SPF record lookups.
         const hasMaxTen = this.hasMaxTenSpfRecords(spfRecords);
         results.maxTenSpfRecords.isValid = hasMaxTen;
+        logger.debug(`Maximum SPF lookups check: ${hasMaxTen}`);
         if (!hasMaxTen) {
             results.maxTenSpfRecords.message = "The number of SPF record lookups should not exceed 10.";
         }
@@ -240,19 +261,23 @@ export class SpfValidator {
         const deprecatedErrors = this.checkDeprecatedMechanisms(spfRecords);
         results.deprecatedMechanisms.isValid = deprecatedErrors.length === 0;
         results.deprecatedMechanisms.errors = deprecatedErrors;
+        logger.debug(`Deprecated mechanisms check complete. Valid: ${results.deprecatedMechanisms.isValid}, Errors: ${deprecatedErrors.length}`);
 
         // 6. Check for unsafe "+all" or "all" mechanisms.
         const unsafeAllErrors = this.isPassAll(spfRecords);
         results.unsafeAllMechanism.isValid = unsafeAllErrors.length === 0;
         results.unsafeAllMechanism.errors = unsafeAllErrors;
+        logger.debug(`Unsafe "all" mechanism check complete. Valid: ${results.unsafeAllMechanism.isValid}`);
 
         // 7. Get the qualifier of the first "all" mechanism.
         const qualifier = this.getFirstAllQualifier(spfRecords);
         results.firstAllQualifier.qualifier = qualifier;
+        logger.debug(`First "all" qualifier found: ${qualifier || 'none'}`);
         if (!qualifier) {
             results.firstAllQualifier.message = "No 'all' mechanism found in initial or redirect records.";
         }
 
+        logger.debug("SPF validation complete", results);
         return results;
     }
 
