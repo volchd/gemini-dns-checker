@@ -11,6 +11,7 @@ import { DkimService } from './services/dkim-service';
 import { DmarcServiceImpl } from './services/dmarc-service';
 import { getConfig } from './config';
 import { logger as appLogger } from './utils/logger';
+import { createScoreController } from './controllers/score-controller';
 
 // Create app factory to handle environment variables
 function createApp(env?: Record<string, string>) {
@@ -75,6 +76,9 @@ function createApp(env?: Record<string, string>) {
   // DMARC routes
   app.get('/api/dmarc', (c) => dmarcController.getDmarcRecord(c));
   app.get('/api/dmarc/validate', (c) => dmarcController.validateDmarcRecord(c));
+
+  // Score route
+  app.get('/api/score', createScoreController(config));
 
   // 404 handler
   app.notFound((c) => {
