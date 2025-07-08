@@ -226,6 +226,90 @@ DKIM record management and validation endpoints.
 }
 ```
 
+### DMARC Validation
+```
+GET /api/dmarc?domain=example.com
+GET /api/dmarc/validate?domain=example.com
+```
+Retrieves and analyzes the DMARC record for a domain. The response now includes a detailed DMARC score breakdown.
+
+**Response for /api/dmarc?domain=example.com:**
+```json
+{
+  "record": {
+    "domain": "example.com",
+    "rawRecord": "v=DMARC1; p=reject; sp=reject; rua=mailto:agg@example.com; adkim=s; aspf=s; pct=100",
+    "parsedData": {
+      "version": "DMARC1",
+      "policy": "reject",
+      "subdomainPolicy": "reject",
+      "percentage": 100,
+      "reportEmails": ["agg@example.com"],
+      "alignmentSpf": "s",
+      "alignmentDkim": "s"
+    },
+    "retrievedAt": "2024-01-01T00:00:00.000Z"
+  },
+  "score": {
+    "totalScore": 29,
+    "maxPossibleScore": 29,
+    "percentage": 100,
+    "scoreItems": [
+      {
+        "name": "DMARC Record Present",
+        "description": "DMARC TXT record found at _dmarc.domain. If missing, that’s a major gap.",
+        "score": 10,
+        "maxScore": 10,
+        "passed": true,
+        "details": "DMARC record found"
+      },
+      {
+        "name": "DMARC Policy Enforcement",
+        "description": "The strictness of the DMARC policy (p=): reject=10, quarantine=8, none=3.",
+        "score": 10,
+        "maxScore": 10,
+        "passed": true,
+        "details": "Policy is 'reject' (full enforcement)"
+      },
+      {
+        "name": "DMARC Coverage for Subdomains",
+        "description": "Subdomain policy in place (sp=) and not weaker than p, or not needed.",
+        "score": 3,
+        "maxScore": 3,
+        "passed": true,
+        "details": "sp=reject (not weaker than p)"
+      },
+      {
+        "name": "DMARC Alignment Mode",
+        "description": "Alignment setting (aspf/adkim): 2 points if relaxed (default) or strict, 0 if misconfigured.",
+        "score": 2,
+        "maxScore": 2,
+        "passed": true,
+        "details": "aspf=s, adkim=s"
+      },
+      {
+        "name": "DMARC Reporting (RUA)",
+        "description": "Aggregate reporting address (rua) is specified to receive feedback.",
+        "score": 2,
+        "maxScore": 2,
+        "passed": true,
+        "details": "rua=agg@example.com"
+      },
+      {
+        "name": "DMARC Policy Percentage",
+        "description": "If a policy is enforced (quarantine/reject), check that pct is 100 (full coverage).",
+        "score": 2,
+        "maxScore": 2,
+        "passed": true,
+        "details": "pct=100"
+      }
+    ]
+  }
+}
+```
+- The `score` object provides a detailed breakdown of DMARC configuration quality, including record presence, policy strictness, subdomain coverage, alignment, reporting, and policy percentage.
+- Scoring is based on best practices for DMARC security and compliance.
+
 ### DoH Provider Management
 ```
 GET /api/doh?domain=example.com

@@ -170,3 +170,19 @@ export interface IDmarcService {
     validateDmarcRecord(domain: string): Promise<DmarcValidationResult>;
     parseDmarcRecord(record: string): DmarcRecord['parsedData'];
 }
+
+export interface DmarcScoreItem {
+    name: string;
+    description: string;
+    score: number;
+    maxScore: number;
+    passed: boolean;
+    details?: string;
+}
+
+export interface DmarcScoringResults {
+    totalScore: number;
+    maxPossibleScore: number;
+    percentage: number;
+    scoreItems: DmarcScoreItem[];
+}

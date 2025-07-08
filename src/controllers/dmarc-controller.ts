@@ -1,9 +1,13 @@
 import { Context } from "hono";
 import { IDmarcService } from "../types";
 import { logger } from "../utils/logger";
+import { DmarcScorer } from "../services/dmarc-scorer";
 
 export class DmarcController {
-    constructor(private dmarcService: IDmarcService) {}
+    private dmarcScorer: DmarcScorer;
+    constructor(private dmarcService: IDmarcService) {
+        this.dmarcScorer = new DmarcScorer();
+    }
 
     async getDmarcRecord(c: Context) {
         try {
@@ -20,7 +24,13 @@ export class DmarcController {
                 return c.json({ error: 'No DMARC record found' }, 404);
             }
 
-            return c.json(record);
+            // Calculate DMARC score
+            const score = this.dmarcScorer.calculateScore(record);
+
+            return c.json({
+                record,
+                score
+            });
         } catch (error) {
             logger.error('Error in getDmarcRecord controller', error as Error);
             return c.json({ error: 'Internal server error' }, 500);
