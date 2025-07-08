@@ -60,7 +60,7 @@ export class DmarcScorer {
             details: policyDetails
         });
 
-        // 3. DMARC Coverage for Subdomains (3 points)
+        // 3. DMARC Coverage for Subdomains (5 points)
         let subdomainScore = 0;
         let subdomainDetails = "";
         if (parsed.subdomainPolicy) {
@@ -69,7 +69,7 @@ export class DmarcScorer {
                 (parsed.policy === "quarantine" && ["quarantine", "reject"].includes(parsed.subdomainPolicy)) ||
                 (parsed.policy === "none" && ["none", "quarantine", "reject"].includes(parsed.subdomainPolicy))
             ) {
-                subdomainScore = 3;
+                subdomainScore = 5;
                 subdomainDetails = `sp=${parsed.subdomainPolicy} (not weaker than p)`;
             } else {
                 subdomainScore = 0;
@@ -77,25 +77,25 @@ export class DmarcScorer {
             }
         } else {
             // If no subdomain policy, assume full points unless there are significant subdomains (not checked here)
-            subdomainScore = 3;
+            subdomainScore = 5;
             subdomainDetails = "No subdomain policy set or not needed";
         }
         scoreItems.push({
             name: "DMARC Coverage for Subdomains",
             description: "Subdomain policy in place (sp=) and not weaker than p, or not needed.",
             score: subdomainScore,
-            maxScore: 3,
+            maxScore: 5,
             passed: subdomainScore === 3,
             details: subdomainDetails
         });
 
-        // 4. DMARC Alignment Mode (2 points)
+        // 4. DMARC Alignment Mode (5 points)
         let alignmentScore = 0;
         let alignmentDetails = "";
         const aspf = parsed.alignmentSpf || "r";
         const adkim = parsed.alignmentDkim || "r";
         if (["r", "s"].includes(aspf) && ["r", "s"].includes(adkim)) {
-            alignmentScore = 2;
+            alignmentScore = 5;
             alignmentDetails = `aspf=${aspf}, adkim=${adkim}`;
         } else {
             alignmentScore = 0;
@@ -105,31 +105,31 @@ export class DmarcScorer {
             name: "DMARC Alignment Mode",
             description: "Alignment setting (aspf/adkim): 2 points if relaxed (default) or strict, 0 if misconfigured.",
             score: alignmentScore,
-            maxScore: 2,
-            passed: alignmentScore === 2,
+            maxScore: 5,
+            passed: alignmentScore === 5,
             details: alignmentDetails
         });
 
-        // 5. DMARC Reporting (RUA) (2 points)
+        // 5. DMARC Reporting (RUA) (5 points)
         const ruaPresent = Array.isArray(parsed.reportEmails) && parsed.reportEmails.length > 0;
         scoreItems.push({
             name: "DMARC Reporting (RUA)",
             description: "Aggregate reporting address (rua) is specified to receive feedback.",
-            score: ruaPresent ? 2 : 0,
-            maxScore: 2,
+            score: ruaPresent ? 5: 0,
+            maxScore: 5,
             passed: ruaPresent,
             details: ruaPresent ? `rua=${parsed.reportEmails!.join(", ")}` : "No rua specified"
         });
 
-        // 6. DMARC Policy Percentage (2 points)
+        // 6. DMARC Policy Percentage (5 points)
         let pctScore = 0;
         let pctDetails = "";
         if (parsed.policy === "reject" || parsed.policy === "quarantine") {
             if (parsed.percentage === undefined || parsed.percentage === 100) {
-                pctScore = 2;
+                pctScore = 5;
                 pctDetails = `pct=${parsed.percentage ?? 100}`;
             } else if (parsed.percentage >= 50) {
-                pctScore = 1;
+                pctScore = 2;
                 pctDetails = `pct=${parsed.percentage}`;
             } else {
                 pctScore = 0;
@@ -144,8 +144,8 @@ export class DmarcScorer {
             name: "DMARC Policy Percentage",
             description: "If a policy is enforced (quarantine/reject), check that pct is 100 (full coverage).",
             score: pctScore,
-            maxScore: 2,
-            passed: pctScore === 2,
+            maxScore: 5,
+            passed: pctScore === 5,
             details: pctDetails
         });
 
