@@ -67,6 +67,7 @@ const defaultConfig: AppConfig = {
       'everlytickey2', // Everlytic secondary
       'eversrv',       // Everlytic legacy
       'mxvault',       // Global Micro
+      'mx',
       'pm',           // ProtonMail
       's1',           // Common secondary selector
       's2',           // Common secondary selector
