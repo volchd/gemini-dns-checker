@@ -171,7 +171,8 @@ export class DkimService implements IDkimService {
     }
 
     parseDkimRecord(record: string): DkimRecord['parsedData'] {
-        const tags = record.split(';').map(tag => tag.trim());
+        // Split on semicolons, ignoring those inside quotes (rare, but RFC-compliant)
+        const tagPairs = record.match(/(?:[^;"']|"[^"]*"|'[^']*')+/g) || [];
         const parsedData: DkimRecord['parsedData'] = {
             version: '',
             algorithm: '',
@@ -182,33 +183,40 @@ export class DkimService implements IDkimService {
             notes: undefined
         };
 
-        for (const tag of tags) {
-            const [key, value] = tag.split('=').map(part => part.trim());
-            
-            switch (key) {
-                case 'v':
-                    parsedData.version = value;
-                    break;
-                case 'a':
-                    parsedData.algorithm = value;
-                    break;
-                case 'k':
-                    parsedData.keyType = value;
-                    break;
-                case 'p':
-                    parsedData.publicKey = value;
-                    break;
-                case 's':
-                    parsedData.serviceType = value;
-                    break;
-                case 't':
-                    parsedData.flags = value.split(':');
-                    break;
-                case 'n':
-                    parsedData.notes = value;
-                    break;
+        // Check if 'v' is present and, if so, that it's first
+        let firstTagKey: string | undefined;
+        for (const pair of tagPairs) {
+            const [rawKey] = pair.split('=');
+            if (rawKey && rawKey.trim()) {
+                firstTagKey = rawKey.trim();
+                break;
             }
         }
+        const hasVTag = tagPairs.some(pair => pair.trim().startsWith('v='));
+        if (hasVTag && firstTagKey !== 'v') {
+            // You can throw, log, or set a flag. Here, we throw:
+            throw new Error("If present, the 'v' tag must be the first tag in the DKIM record (RFC 6376 3.6.1).");
+        }
+
+        // Use a map to handle repeated tags (last one wins)
+        const tagMap: Record<string, string> = {};
+
+        for (const pair of tagPairs) {
+            const [rawKey, ...rawValueParts] = pair.split('=');
+            if (!rawKey || rawValueParts.length === 0) continue; // skip invalid
+            const key = rawKey.trim();
+            const value = rawValueParts.join('=').trim(); // in case value contains '='
+            tagMap[key] = value;
+        }
+
+        // Assign known tags
+        if ('v' in tagMap) parsedData.version = tagMap['v'];
+        if ('a' in tagMap) parsedData.algorithm = tagMap['a'];
+        if ('k' in tagMap) parsedData.keyType = tagMap['k'];
+        if ('p' in tagMap) parsedData.publicKey = tagMap['p']; // can be empty string
+        if ('s' in tagMap) parsedData.serviceType = tagMap['s'];
+        if ('t' in tagMap) parsedData.flags = tagMap['t'].split(':').map(f => f.trim()).filter(Boolean);
+        if ('n' in tagMap) parsedData.notes = tagMap['n'];
 
         return parsedData;
     }
