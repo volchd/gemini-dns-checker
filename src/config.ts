@@ -70,6 +70,13 @@ const defaultConfig: AppConfig = {
       'pm',           // ProtonMail
       's1',           // Common secondary selector
       's2',           // Common secondary selector
+      's3',           // Common secondary selector
+      's4',           // Common secondary selector
+      's5',           // Common secondary selector
+      's6',           // Common secondary selector
+      's7',           // Common secondary selector
+      's8',           // Common secondary selector
+      's9',           // Common secondary selector
       'smtp',         // Common SMTP selector
       
       // Amazon SES

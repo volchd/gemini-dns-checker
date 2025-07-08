@@ -5,8 +5,10 @@ import { createDnsController } from './controllers/dns-controller';
 import { createSpfController } from './controllers/spf-controller';
 import { createDohController, createDohListController } from './controllers/doh-controller';
 import { DkimController } from './controllers/dkim-controller';
+import { DmarcController } from './controllers/dmarc-controller';
 import { DnsServiceImpl } from './services/dns-service';
 import { DkimService } from './services/dkim-service';
+import { DmarcServiceImpl } from './services/dmarc-service';
 import { getConfig } from './config';
 import { logger as appLogger } from './utils/logger';
 
@@ -23,6 +25,8 @@ function createApp(env?: Record<string, string>) {
   const dnsService = new DnsServiceImpl();
   const dkimService = new DkimService(dnsService);
   const dkimController = new DkimController(dkimService);
+  const dmarcService = new DmarcServiceImpl(dnsService);
+  const dmarcController = new DmarcController(dmarcService);
 
   // Global middleware
   app.use('*', logger());
@@ -45,6 +49,7 @@ function createApp(env?: Record<string, string>) {
         dns: '/api/dns/:domain',
         spf: '/api/spf/:domain',
         dkim: '/api/dkim/:domain',
+        dmarc: '/api/dmarc/:domain',
         doh: '/api/doh/:domain'
       }
     });
@@ -66,7 +71,10 @@ function createApp(env?: Record<string, string>) {
   app.get('/api/dkim', (c) => dkimController.getDkimRecords(c));
   app.get('/api/dkim/record', (c) => dkimController.getDkimRecord(c));
   app.get('/api/dkim/validate', (c) => dkimController.validateDkimRecords(c));
-  app.get('/api/dkim/selectors', (c) => dkimController.discoverSelectors(c));
+
+  // DMARC routes
+  app.get('/api/dmarc', (c) => dmarcController.getDmarcRecord(c));
+  app.get('/api/dmarc/validate', (c) => dmarcController.validateDmarcRecord(c));
 
   // 404 handler
   app.notFound((c) => {
@@ -82,7 +90,8 @@ function createApp(env?: Record<string, string>) {
         '/api/dkim?domain=example.com',
         '/api/dkim/record?domain=example.com&selector=default',
         '/api/dkim/validate?domain=example.com',
-        '/api/dkim/selectors?domain=example.com'
+        '/api/dmarc?domain=example.com',
+        '/api/dmarc/validate?domain=example.com'
       ],
       timestamp: new Date().toISOString()
     }, 404);

@@ -126,3 +126,47 @@ export interface IDkimService {
     discoverSelectors(domain: string): Promise<string[]>;
     parseDkimRecord(record: string): DkimRecord['parsedData'];
 }
+
+export interface DmarcRecord {
+    domain: string;
+    rawRecord: string;
+    parsedData: {
+        version: string;          // v=DMARC1
+        policy: string;          // p=none|quarantine|reject
+        subdomainPolicy?: string; // sp=none|quarantine|reject
+        percentage?: number;      // pct=
+        reportFormat?: string[];  // rf=
+        reportInterval?: number;  // ri=
+        reportEmails?: string[];  // rua=
+        forensicEmails?: string[]; // ruf=
+        failureOptions?: string[]; // fo=
+        alignmentSpf?: string;    // aspf=r|s
+        alignmentDkim?: string;   // adkim=r|s
+    };
+    retrievedAt: Date;
+}
+
+export interface DmarcValidationIssue {
+    code: string;
+    message: string;
+    severity: 'error' | 'warning' | 'info';
+}
+
+export interface DmarcValidationResult {
+    domain: string;
+    isValid: boolean;
+    record: DmarcRecord | null;
+    checks: {
+        hasValidVersion: boolean;
+        hasValidPolicy: boolean;
+        hasValidSyntax: boolean;
+        hasValidReportAddresses: boolean;
+    };
+    issues: DmarcValidationIssue[];
+}
+
+export interface IDmarcService {
+    getDmarcRecord(domain: string): Promise<DmarcRecord | null>;
+    validateDmarcRecord(domain: string): Promise<DmarcValidationResult>;
+    parseDmarcRecord(record: string): DmarcRecord['parsedData'];
+}
