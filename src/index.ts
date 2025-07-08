@@ -1,11 +1,14 @@
-import { Hono } from "hono";
+import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { createDnsController } from "./controllers/dns-controller";
-import { createSpfController } from "./controllers/spf-controller";
-import { createDohController, createDohListController } from "./controllers/doh-controller";
-import { getConfig } from "./config";
-import { logger as appLogger } from "./utils/logger";
+import { createDnsController } from './controllers/dns-controller';
+import { createSpfController } from './controllers/spf-controller';
+import { createDohController, createDohListController } from './controllers/doh-controller';
+import { DkimController } from './controllers/dkim-controller';
+import { DnsServiceImpl } from './services/dns-service';
+import { DkimService } from './services/dkim-service';
+import { getConfig } from './config';
+import { logger as appLogger } from './utils/logger';
 
 // Create app factory to handle environment variables
 function createApp(env?: Record<string, string>) {
@@ -15,6 +18,11 @@ function createApp(env?: Record<string, string>) {
 
   // Configure logging level
   appLogger.setLogLevel(config.logging.level as any);
+
+  // Initialize services
+  const dnsService = new DnsServiceImpl();
+  const dkimService = new DkimService(dnsService);
+  const dkimController = new DkimController(dkimService);
 
   // Global middleware
   app.use('*', logger());
@@ -34,25 +42,48 @@ function createApp(env?: Record<string, string>) {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       endpoints: {
-        dns: '/checkDNS?domain=example.com',
-        spf: '/spf?domain=example.com',
-        dohUrl: '/doh-url',
-        dohUrls: '/doh-urls'
+        dns: '/api/dns/:domain',
+        spf: '/api/spf/:domain',
+        dkim: '/api/dkim/:domain',
+        doh: '/api/doh/:domain'
       }
     });
   });
 
-  // API routes
-  app.get("/checkDNS", createDnsController(config));
-  app.get("/spf", createSpfController(config));
-  app.get("/doh-url", createDohController(config));
-  app.get("/doh-urls", createDohListController(config));
+  // DNS routes
+  app.get('/api/dns', createDnsController(config));
+  app.get('/api/dns/txt', createDnsController(config));
+
+  // DoH routes
+  app.get('/api/doh', createDohController(config));
+  app.get('/api/doh/urls', createDohListController(config));
+
+  // SPF routes
+  app.get('/api/spf', createSpfController(config));
+  app.get('/api/spf/score', createSpfController(config));
+
+  // DKIM routes
+  app.get('/api/dkim', (c) => dkimController.getDkimRecords(c));
+  app.get('/api/dkim/record', (c) => dkimController.getDkimRecord(c));
+  app.get('/api/dkim/validate', (c) => dkimController.validateDkimRecords(c));
+  app.get('/api/dkim/selectors', (c) => dkimController.discoverSelectors(c));
 
   // 404 handler
   app.notFound((c) => {
     return c.json({
       error: 'Endpoint not found',
-      availableEndpoints: ['/checkDNS', '/spf', '/doh-url', '/doh-urls'],
+      availableEndpoints: [
+        '/api/dns?domain=example.com',
+        '/api/dns/txt?domain=example.com',
+        '/api/doh?domain=example.com',
+        '/api/doh/urls',
+        '/api/spf?domain=example.com',
+        '/api/spf/score?domain=example.com',
+        '/api/dkim?domain=example.com',
+        '/api/dkim/record?domain=example.com&selector=default',
+        '/api/dkim/validate?domain=example.com',
+        '/api/dkim/selectors?domain=example.com'
+      ],
       timestamp: new Date().toISOString()
     }, 404);
   });

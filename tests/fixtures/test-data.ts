@@ -91,3 +91,25 @@ export const TEST_CONFIG = {
     enableRequestLogging: true
   }
 };
+
+export const DKIM_TEST_DATA = {
+    validRecords: {
+        google: 'v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC; t=y:s; n=test notes',
+        default: 'v=DKIM1; a=rsa-sha256; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC',
+        selector1: 'v=DKIM1; a=rsa-sha256; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC; s=email',
+        selector2: 'v=DKIM1; a=rsa-sha256; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC'
+    },
+    invalidRecords: {
+        missingVersion: 'k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC',
+        invalidVersion: 'v=DKIM2; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC',
+        missingPublicKey: 'v=DKIM1; k=rsa;',
+        invalidAlgorithm: 'v=DKIM1; a=invalid; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC',
+        malformed: 'v=DKIM1; k=rsa; p=invalid_key_data'
+    },
+    testDomains: {
+        valid: 'example.com',
+        withMultipleRecords: 'multi.example.com',
+        withNoRecords: 'no-dkim.example.com',
+        withInvalidRecords: 'invalid.example.com'
+    }
+};

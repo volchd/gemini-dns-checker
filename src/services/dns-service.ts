@@ -1,5 +1,5 @@
 import { DnsResponse } from "../types";
-import { AppConfig } from "../config";
+import { AppConfig, config } from "../config";
 import { logger } from "../utils/logger";
 import { getRandomDohUrl } from "./doh-balancer";
 
@@ -14,6 +14,44 @@ export interface DnsQueryResult {
   isRegistered: boolean;
   dnsResponse: DnsResponse;
   queryTime?: number;
+}
+
+export interface DnsService {
+    queryTxt(domain: string): Promise<string[]>;
+}
+
+export class DnsServiceImpl implements DnsService {
+    async queryTxt(domain: string): Promise<string[]> {
+        try {
+            logger.info(`Querying TXT records for domain: ${domain}`);
+            const response = await queryDnsRecord(domain, 'TXT', config);
+            
+            if (!response.Answer) {
+                logger.info(`No TXT records found for domain: ${domain}`);
+                return [];
+            }
+
+            // Extract TXT records from the response
+            // DNS responses often include quotes around TXT record data
+            // and may split long TXT records into multiple parts
+            const txtRecords = response.Answer
+                .filter(answer => answer.type === 16) // Type 16 is TXT
+                .map(answer => {
+                    // Handle potential array of strings or single string
+                    const data = Array.isArray(answer.data) ? answer.data : [answer.data];
+                    // Join parts and remove surrounding quotes if present
+                    return data
+                        .map(part => part.replace(/^"(.*)"$/, '$1'))
+                        .join('');
+                });
+
+            logger.info(`Found ${txtRecords.length} TXT records for domain: ${domain}`);
+            return txtRecords;
+        } catch (error) {
+            logger.error(`Failed to query TXT records for domain: ${domain}`, error as Error);
+            throw new Error(`Failed to query TXT records: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
 }
 
 /**

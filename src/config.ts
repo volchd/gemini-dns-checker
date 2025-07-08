@@ -9,6 +9,9 @@ export interface AppConfig {
     maxRecordLength: number;
     maxRecords: number;
   };
+  dkim: {
+    commonSelectors: string[];
+  };
   server: {
     port: number;
     cors: {
@@ -36,6 +39,74 @@ const defaultConfig: AppConfig = {
     maxLookups: 10,
     maxRecordLength: 255,
     maxRecords: 1
+  },
+  dkim: {
+    commonSelectors: [
+      // Microsoft 365
+      'selector1',     // Primary Microsoft 365 selector
+      'selector2',     // Secondary Microsoft 365 selector
+      
+      // Google Workspace
+      'google',        // Primary Google Workspace selector
+      
+      // Generic/Common
+      'default',       // Generic default selector
+      'dkim',          // Common generic selector
+      'mail',          // Common generic selector
+      'k1',           // MailChimp/Mandrill selector
+      'k2',           // MailChimp/Mandrill selector
+      'k3',           // MailChimp/Mandrill selector
+      'k4',           // MailChimp/Mandrill selector
+      'k5',           // MailChimp/Mandrill selector
+      'k6',           // MailChimp/Mandrill selector
+      'k7',           // MailChimp/Mandrill selector
+      'k8',           // MailChimp/Mandrill selector
+      
+      // Email Service Providers
+      'everlytickey1', // Everlytic primary
+      'everlytickey2', // Everlytic secondary
+      'eversrv',       // Everlytic legacy
+      'mxvault',       // Global Micro
+      'pm',           // ProtonMail
+      's1',           // Common secondary selector
+      's2',           // Common secondary selector
+      'smtp',         // Common SMTP selector
+      
+      // Amazon SES
+      'amazonses',     // Amazon SES default
+      
+      // SendGrid
+      'smtpapi',      // SendGrid
+      's1024',        // SendGrid legacy
+      
+      // Zoho
+      'zoho',         // Zoho Mail
+      
+      // Other Common Services
+      'mailjet',      // Mailjet
+      'postmark',     // Postmark
+      'sendinblue',   // Sendinblue/Brevo
+      'qualtrics',    // Qualtrics
+      'mandrill',     // Mandrill
+      'mailchimp',    // Mailchimp
+      'mailgun',      // Mailgun
+      'sparkpost',    // Sparkpost
+      'sendgrid',     // Sendgrid
+      'sendinblue',   // Sendinblue/Brevo
+      'sendinblue',   // Sendinblue/Brevo
+      
+      // Zendesk
+      'zendesk',      // Zendesk
+      'zendesk1', // Zendesk
+      'zendesk2', // Zendesk
+      'zohomail',     // Zoho Mail
+      'zohomail',     // Zoho Mail
+
+      // Date-based (for custom implementations)
+      'current',      // Current selector
+      'previous',     // Previous selector
+      'rotate',       // Rotation selector
+    ]
   },
   server: {
     port: 8787,

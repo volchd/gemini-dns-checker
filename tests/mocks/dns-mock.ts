@@ -1,4 +1,6 @@
 import { DnsResponse } from '../../src/types';
+import { DnsService } from '../../src/services/dns-service';
+import { DKIM_TEST_DATA } from '../fixtures/test-data';
 
 export class DnsMock {
   static mockSuccessfulResponse(domain: string, recordType: string = 'A'): jest.Mock {
@@ -101,4 +103,54 @@ export class DnsMock {
     
     return mock;
   }
+}
+
+export class MockDnsService implements DnsService {
+    private mockResponses: Map<string, string[]>;
+
+    constructor() {
+        this.mockResponses = new Map();
+        this.setupDefaultMocks();
+    }
+
+    private setupDefaultMocks() {
+        // Set up DKIM record mocks
+        const { validRecords, invalidRecords, testDomains } = DKIM_TEST_DATA;
+
+        // Mock valid domain with single record
+        this.mockResponses.set(
+            `google._domainkey.${testDomains.valid}`,
+            [validRecords.google]
+        );
+
+        // Mock domain with multiple records
+        this.mockResponses.set(
+            `selector1._domainkey.${testDomains.withMultipleRecords}`,
+            [validRecords.selector1]
+        );
+        this.mockResponses.set(
+            `selector2._domainkey.${testDomains.withMultipleRecords}`,
+            [validRecords.selector2]
+        );
+
+        // Mock domain with invalid records
+        this.mockResponses.set(
+            `default._domainkey.${testDomains.withInvalidRecords}`,
+            [invalidRecords.invalidVersion]
+        );
+    }
+
+    async queryTxt(domain: string): Promise<string[]> {
+        const records = this.mockResponses.get(domain);
+        return records || [];
+    }
+
+    setMockResponse(domain: string, records: string[]) {
+        this.mockResponses.set(domain, records);
+    }
+
+    clearMocks() {
+        this.mockResponses.clear();
+        this.setupDefaultMocks();
+    }
 }

@@ -56,3 +56,57 @@ export interface SpfScoringResults {
     grade: string;
     scoreItems: SpfScoreItem[];
 }
+
+export interface DkimRecord {
+    domain: string;
+    selector: string;
+    rawRecord: string;
+    parsedData: {
+        version: string;          // v=DKIM1
+        algorithm: string;        // a=rsa-sha256
+        keyType: string;         // k=rsa
+        publicKey: string;       // p=base64encoded...
+        serviceType?: string;    // s=email (optional)
+        flags?: string[];       // t=y|s|... (optional)
+        notes?: string;         // n=notes (optional)
+    };
+    retrievedAt: Date;
+}
+
+export interface DkimRecordSet {
+    domain: string;
+    records: DkimRecord[];
+    retrievedAt: Date;
+}
+
+export type DkimValidationIssue = {
+    code: string;
+    message: string;
+    severity: 'error' | 'warning' | 'info';
+};
+
+export interface DkimValidationResult {
+    domain: string;
+    isValid: boolean;
+    records: Array<{
+        selector: string;
+        isValid: boolean;
+        checks: {
+            hasValidSelector: boolean;
+            hasValidVersion: boolean;
+            hasValidAlgorithm: boolean;
+            hasValidPublicKey: boolean;
+            hasValidSyntax: boolean;
+        };
+        issues: DkimValidationIssue[];
+    }>;
+    domainIssues: DkimValidationIssue[];
+}
+
+export interface IDkimService {
+    getDkimRecords(domain: string): Promise<DkimRecordSet>;
+    getDkimRecord(domain: string, selector: string): Promise<DkimRecord>;
+    validateDkimRecords(domain: string): Promise<DkimValidationResult>;
+    discoverSelectors(domain: string): Promise<string[]>;
+    parseDkimRecord(record: string): DkimRecord['parsedData'];
+}
