@@ -32,12 +32,18 @@ function createApp(env?: Record<string, string>) {
   // Global middleware
   app.use('*', logger());
   app.use('*', cors({
-    origin: config.server.cors.origins,
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-    exposeHeaders: ['Content-Length'],
+    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:8080'],
+    allowMethods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposeHeaders: ['Content-Length', 'X-Total-Count'],
+    credentials: true,
     maxAge: 86400,
   }));
+
+  // Handle preflight requests
+  app.options('*', (c) => {
+    return new Response(null, { status: 204 });
+  });
 
   // Health check endpoint
   app.get('/', (c) => {
