@@ -185,13 +185,13 @@ export class SpfScorer {
      */
     private scoreNoDeprecatedMechanisms(validationResults: SpfValidationResults, scoreItems: SpfScoreItem[]): number {
         const passed = validationResults.deprecatedMechanisms.isValid;
-        const score = passed ? 2 : 0;
+        const score = passed ? 5 : 0;
         
         scoreItems.push({
             name: "No Deprecated Mechanisms",
             description: "SPF record does not use deprecated mechanisms like ptr. (If none, give 2 points; if present, 0.)",
             score,
-            maxScore: 2,
+            maxScore: 5,
             passed,
             details: passed ? "No deprecated mechanisms found" : "Deprecated mechanisms found"
         });
