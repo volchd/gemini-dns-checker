@@ -11,7 +11,7 @@ describe('DkimController', () => {
     let dkimService: DkimService;
     let mockDnsService: MockDnsService;
     let mockContext: {
-        req: { param: jest.Mock };
+        req: { param: jest.Mock; header: jest.Mock; query: jest.Mock };
         json: jest.Mock;
     };
 
@@ -22,7 +22,12 @@ describe('DkimController', () => {
 
         mockContext = {
             req: {
-                param: jest.fn()
+                param: jest.fn(),
+                header: jest.fn().mockReturnValue('test-user-agent'),
+                query: jest.fn((key: string) => {
+                    // Simulate query fallback to param for test compatibility
+                    return mockContext.req.param(key);
+                })
             },
             json: jest.fn()
         };
@@ -99,7 +104,7 @@ describe('DkimController', () => {
             await dkimController.getDkimRecords(mockContext as unknown as Context);
 
             expect(mockContext.json).toHaveBeenCalledWith(
-                { error: 'Domain parameter is required' },
+                expect.objectContaining({ error: 'Domain parameter is required', requestId: expect.any(String) }),
                 400
             );
         });
@@ -135,7 +140,7 @@ describe('DkimController', () => {
             await dkimController.getDkimRecord(mockContext as unknown as Context);
 
             expect(mockContext.json).toHaveBeenCalledWith(
-                { error: 'Domain and selector parameters are required' },
+                expect.objectContaining({ error: 'Domain and selector parameters are required', requestId: expect.any(String) }),
                 400
             );
         });
@@ -179,7 +184,7 @@ describe('DkimController', () => {
             await dkimController.validateDkimRecords(mockContext as unknown as Context);
 
             expect(mockContext.json).toHaveBeenCalledWith(
-                { error: 'Domain parameter is required' },
+                expect.objectContaining({ error: 'Domain parameter is required', requestId: expect.any(String) }),
                 400
             );
         });
@@ -193,10 +198,15 @@ describe('DkimController', () => {
 
             await dkimController.discoverSelectors(mockContext as unknown as Context);
 
-            expect(mockContext.json).toHaveBeenCalledWith({
-                domain,
-                selectors: ['selector1', 'selector2']
-            });
+            expect(mockContext.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    domain,
+                    selectors: ['selector1', 'selector2'],
+                    requestId: expect.any(String),
+                    responseTime: expect.any(Number),
+                    timestamp: expect.any(String)
+                })
+            );
         });
 
         it('should return 400 when domain is missing', async () => {
@@ -205,7 +215,7 @@ describe('DkimController', () => {
             await dkimController.discoverSelectors(mockContext as unknown as Context);
 
             expect(mockContext.json).toHaveBeenCalledWith(
-                { error: 'Domain parameter is required' },
+                expect.objectContaining({ error: 'Domain parameter is required', requestId: expect.any(String) }),
                 400
             );
         });
@@ -217,10 +227,15 @@ describe('DkimController', () => {
 
             await dkimController.discoverSelectors(mockContext as unknown as Context);
 
-            expect(mockContext.json).toHaveBeenCalledWith({
-                domain,
-                selectors: []
-            });
+            expect(mockContext.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    domain,
+                    selectors: [],
+                    requestId: expect.any(String),
+                    responseTime: expect.any(Number),
+                    timestamp: expect.any(String)
+                })
+            );
         });
     });
 }); 

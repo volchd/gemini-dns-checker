@@ -79,6 +79,9 @@ export const TEST_CONFIG = {
     maxRecordLength: 255,
     maxRecords: 1
   },
+  dkim: {
+    commonSelectors: ['selector1', 'selector2', 'google', 'default']
+  },
   server: {
     port: 8787,
     cors: {

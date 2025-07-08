@@ -5,17 +5,20 @@ describe('DoH Balancer Service', () => {
   const mockConfig: AppConfig = {
     dns: {
       dohUrls: [
-        'https://cloudflare-dns.com/dns-query',
         'https://dns.google/resolve',
-        'https://doh.opendns.com/dns-query'
+        'https://cloudflare-dns.com/dns-query',
+        'https://unfiltered.adguard-dns.com/resolve'
       ],
-      timeout: 10000,
-      retries: 3
+      timeout: 5000,
+      retries: 2
     },
     spf: {
       maxLookups: 10,
       maxRecordLength: 255,
       maxRecords: 1
+    },
+    dkim: {
+      commonSelectors: ['selector1', 'selector2', 'google', 'default']
     },
     server: {
       port: 8787,
@@ -25,7 +28,7 @@ describe('DoH Balancer Service', () => {
       }
     },
     logging: {
-      level: 'info',
+      level: 'debug',
       enableRequestLogging: true
     }
   };

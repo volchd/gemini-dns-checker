@@ -107,6 +107,7 @@ export class DnsMock {
 
 export class MockDnsService implements DnsService {
     private mockResponses: Map<string, string[]>;
+    private queryCallCount: Map<string, number> = new Map();
 
     constructor() {
         this.mockResponses = new Map();
@@ -141,6 +142,10 @@ export class MockDnsService implements DnsService {
     }
 
     async queryTxt(domain: string): Promise<string[]> {
+        // Track query calls for testing
+        const currentCount = this.queryCallCount.get(domain) || 0;
+        this.queryCallCount.set(domain, currentCount + 1);
+        
         const records = this.mockResponses.get(domain);
         return records || [];
     }
@@ -151,6 +156,15 @@ export class MockDnsService implements DnsService {
 
     clearMocks() {
         this.mockResponses.clear();
+        this.queryCallCount.clear();
         this.setupDefaultMocks();
+    }
+
+    getQueryCallCount(domain: string): number {
+        return this.queryCallCount.get(domain) || 0;
+    }
+
+    resetQueryCallCount() {
+        this.queryCallCount.clear();
     }
 }

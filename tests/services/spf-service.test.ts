@@ -49,7 +49,10 @@ describe('SPF Service', () => {
       expect(fetch).toHaveBeenCalledWith(
         `${testConfig.dns.dohUrls[0]}?name=example.com&type=TXT`,
         expect.objectContaining({
-          headers: { Accept: 'application/dns-json' }
+          headers: { 
+            Accept: 'application/dns-json',
+            'User-Agent': 'Mozilla/5.0 (compatible; GeminiDNSChecker/1.0)'
+          }
         })
       );
     });

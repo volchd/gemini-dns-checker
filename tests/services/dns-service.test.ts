@@ -1,14 +1,31 @@
 import { checkDnsRegistration, queryDnsRecord } from '../../src/services/dns-service';
 import { getConfig } from '../../src/config';
+import * as dohBalancer from '../../src/services/doh-balancer';
 
 // Mock fetch globally
 global.fetch = jest.fn();
+
+// Mock the DoH balancer to return predictable URLs
+jest.mock('../../src/services/doh-balancer');
+const mockDohBalancer = dohBalancer as jest.Mocked<typeof dohBalancer>;
+
+// Mock the logger to reduce console output
+jest.mock('../../src/utils/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn()
+  }
+}));
 
 describe('DNS Service', () => {
   const testConfig = getConfig();
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Mock getRandomDohUrl to always return the first URL for predictable testing
+    mockDohBalancer.getRandomDohUrl.mockReturnValue(testConfig.dns.dohUrls[0]);
   });
 
   describe('checkDnsRegistration', () => {
@@ -42,7 +59,10 @@ describe('DNS Service', () => {
       expect(fetch).toHaveBeenCalledWith(
         `${testConfig.dns.dohUrls[0]}?name=example.com&type=A`,
         expect.objectContaining({
-          headers: { Accept: 'application/dns-json' }
+          headers: { 
+            Accept: 'application/dns-json',
+            'User-Agent': 'Mozilla/5.0 (compatible; GeminiDNSChecker/1.0)'
+          }
         })
       );
     });
@@ -138,7 +158,12 @@ describe('DNS Service', () => {
 
       expect(fetch).toHaveBeenCalledWith(
         `${testConfig.dns.dohUrls[0]}?name=example.com&type=TXT`,
-        expect.any(Object)
+        expect.objectContaining({
+          headers: { 
+            Accept: 'application/dns-json',
+            'User-Agent': 'Mozilla/5.0 (compatible; GeminiDNSChecker/1.0)'
+          }
+        })
       );
     });
   });

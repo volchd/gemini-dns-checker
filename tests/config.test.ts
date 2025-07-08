@@ -52,7 +52,11 @@ describe('Configuration', () => {
       const config = getConfig();
       
       // DNS defaults
-      expect(config.dns.dohUrls).toEqual(['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query']);
+      expect(config.dns.dohUrls).toEqual([
+        'https://dns.google/resolve', 
+        'https://cloudflare-dns.com/dns-query',
+        'https://unfiltered.adguard-dns.com/resolve'
+      ]);
       expect(config.dns.timeout).toBe(10000);
       expect(config.dns.retries).toBe(3);
       
@@ -156,7 +160,11 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrls).toEqual(['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query']); // default
+      expect(config.dns.dohUrls).toEqual([
+        'https://dns.google/resolve', 
+        'https://cloudflare-dns.com/dns-query',
+        'https://unfiltered.adguard-dns.com/resolve'
+      ]); // default
       expect(config.dns.timeout).toBe(15000); // overridden
       expect(config.dns.retries).toBe(3); // default
     });
@@ -280,7 +288,11 @@ describe('Configuration', () => {
       
       const config = getConfig(env);
       
-      expect(config.dns.dohUrls).toEqual(['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query']); // Falls back to default
+      expect(config.dns.dohUrls).toEqual([
+        'https://dns.google/resolve', 
+        'https://cloudflare-dns.com/dns-query',
+        'https://unfiltered.adguard-dns.com/resolve'
+      ]); // Falls back to default
       expect(config.dns.timeout).toBe(10000); // Falls back to default, then parsed as valid number
       expect(config.dns.retries).toBe(3); // Falls back to default, then parsed as valid number
       expect(config.logging.level).toBe('info'); // Falls back to default
@@ -348,7 +360,11 @@ describe('Configuration', () => {
       
       const config = getConfig(devEnv);
       
-      expect(config.dns.dohUrls).toEqual(['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query']); // default
+      expect(config.dns.dohUrls).toEqual([
+        'https://dns.google/resolve', 
+        'https://cloudflare-dns.com/dns-query',
+        'https://unfiltered.adguard-dns.com/resolve'
+      ]); // default
       expect(config.dns.timeout).toBe(5000);
       expect(config.dns.retries).toBe(3); // default
       expect(config.logging.level).toBe('debug');

@@ -2,6 +2,16 @@ import { DkimService } from '../../src/services/dkim-service';
 import { MockDnsService } from '../mocks/dns-mock';
 import { DKIM_TEST_DATA } from '../fixtures/test-data';
 
+// Mock the logger to reduce console output
+jest.mock('../../src/utils/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn()
+  }
+}));
+
 describe('DkimService', () => {
     let dkimService: DkimService;
     let mockDnsService: MockDnsService;
@@ -65,14 +75,21 @@ describe('DkimService', () => {
 
         it('should use cached results within TTL', async () => {
             const domain = DKIM_TEST_DATA.testDomains.withMultipleRecords;
-            const spy = jest.spyOn(mockDnsService, 'queryTxt');
-
-            await dkimService.discoverSelectors(domain);
-            spy.mockClear();
-            const result = await dkimService.discoverSelectors(domain);
-
-            expect(result).toEqual(['selector1', 'selector2']);
-            expect(spy).not.toHaveBeenCalled();
+            
+            // First call should query DNS
+            const result1 = await dkimService.discoverSelectors(domain);
+            expect(result1).toEqual(['selector1', 'selector2']);
+            
+            // Reset call count to track second call
+            mockDnsService.resetQueryCallCount();
+            
+            // Second call should use cache
+            const result2 = await dkimService.discoverSelectors(domain);
+            expect(result2).toEqual(['selector1', 'selector2']);
+            
+            // Verify no DNS queries were made on second call
+            expect(mockDnsService.getQueryCallCount(`selector1._domainkey.${domain}`)).toBe(0);
+            expect(mockDnsService.getQueryCallCount(`selector2._domainkey.${domain}`)).toBe(0);
         });
     });
 

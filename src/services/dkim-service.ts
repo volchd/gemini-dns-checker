@@ -11,6 +11,8 @@ import { logger } from '../utils/logger';
 
 export class DkimService implements IDkimService {
     private readonly dnsService: DnsService;
+    private readonly selectorCache: Map<string, { selectors: string[], timestamp: number }> = new Map();
+    private readonly cacheTTL = 300000; // 5 minutes in milliseconds
 
     constructor(dnsService: DnsService) {
         this.dnsService = dnsService;
@@ -128,6 +130,16 @@ export class DkimService implements IDkimService {
     }
 
     async discoverSelectors(domain: string): Promise<string[]> {
+        // Check cache first
+        const cacheKey = `selectors:${domain}`;
+        const cached = this.selectorCache.get(cacheKey);
+        const now = Date.now();
+        
+        if (cached && (now - cached.timestamp) < this.cacheTTL) {
+            logger.info(`Using cached selectors for domain: ${domain}`);
+            return cached.selectors;
+        }
+
         const discoveredSelectors: string[] = [];
         await Promise.all(
             config.dkim.commonSelectors.map(async (selector) => {
@@ -148,6 +160,12 @@ export class DkimService implements IDkimService {
                 }
             })
         );
+
+        // Cache the results
+        this.selectorCache.set(cacheKey, {
+            selectors: discoveredSelectors,
+            timestamp: now
+        });
 
         return discoveredSelectors;
     }
