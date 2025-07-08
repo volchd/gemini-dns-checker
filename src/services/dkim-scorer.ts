@@ -1,4 +1,5 @@
 import { DkimRecordSet, DkimRecord, DkimScoreItem, DkimScoringResults } from "../types";
+import { logger } from "../utils/logger";
 
 export class DkimScorer {
     /**
@@ -26,31 +27,117 @@ export class DkimScorer {
         let maxKeyLength = 0;
         let hasWeakKey = false;
         const keyLengths: { selector: string; bits: number | null }[] = [];
+        
         for (const record of records) {
             let bits: number | null = null;
             try {
                 if (record.parsedData.publicKey) {
-                    const keyData = record.parsedData.publicKey.replace(/\s+/g, '');
+                    // Clean and normalize the key data
+                    let keyData = record.parsedData.publicKey
+                        .replace(/\s+/g, '')  // Remove all whitespace
+                        .replace(/"+/g, '');  // Remove any quotes
+                    
+                    // Add padding if needed
+                    while (keyData.length % 4) {
+                        keyData += '=';
+                    }
+
+                    // Decode base64 to get the raw key bytes
                     const binary = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
-                    const cryptoKey = await crypto.subtle.importKey(
-                        'spki',
-                        binary.buffer,
-                        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-                        false,
-                        ['verify']
-                    );
-                    // @ts-ignore: modulusLength is not standard, but may be present in Workers
-                    bits = cryptoKey.algorithm.modulusLength || null;
+                    logger.debug(`Decoded key length: ${binary.length} bytes for selector ${record.selector}`);
+
+                    // Parse ASN.1 structure
+                    let pos = 0;
+                    
+                    // All RSA keys start with a SEQUENCE
+                    if (binary[pos++] !== 0x30) {
+                        throw new Error('Not a valid RSA key (expected sequence)');
+                    }
+                    
+                    // Get sequence length
+                    let seqLength = binary[pos++];
+                    if ((seqLength & 0x80) === 0x80) {
+                        const lenBytes = seqLength & 0x7F;
+                        seqLength = 0;
+                        for (let i = 0; i < lenBytes; i++) {
+                            seqLength = (seqLength << 8) | binary[pos++];
+                        }
+                    }
+
+                    // Check if this is a SubjectPublicKeyInfo structure
+                    const isSpki = binary[pos] === 0x30;
+                    
+                    if (isSpki) {
+                        // Skip the AlgorithmIdentifier sequence
+                        pos++; // Skip SEQUENCE tag
+                        let algLength = binary[pos++];
+                        if ((algLength & 0x80) === 0x80) {
+                            const lenBytes = algLength & 0x7F;
+                            pos += lenBytes + binary[pos];
+                        } else {
+                            pos += algLength;
+                        }
+                        
+                        // Skip BIT STRING tag and length
+                        if (binary[pos++] !== 0x03) {
+                            throw new Error('Expected BIT STRING tag');
+                        }
+                        let bitStringLength = binary[pos++];
+                        if ((bitStringLength & 0x80) === 0x80) {
+                            const lenBytes = bitStringLength & 0x7F;
+                            pos += lenBytes;
+                        }
+                        pos++; // Skip unused bits byte
+                        
+                        // Now we're at the start of the RSA key sequence
+                        if (binary[pos++] !== 0x30) {
+                            throw new Error('Expected RSA key sequence');
+                        }
+                        
+                        // Skip the sequence length
+                        let keySeqLength = binary[pos++];
+                        if ((keySeqLength & 0x80) === 0x80) {
+                            const lenBytes = keySeqLength & 0x7F;
+                            pos += lenBytes;
+                        }
+                    }
+                    
+                    // Now we're at the modulus INTEGER tag
+                    if (binary[pos++] !== 0x02) {
+                        throw new Error('Expected INTEGER tag for modulus');
+                    }
+                    
+                    // Get modulus length
+                    let modulusLength = binary[pos++];
+                    if ((modulusLength & 0x80) === 0x80) {
+                        const lenBytes = modulusLength & 0x7F;
+                        modulusLength = 0;
+                        for (let i = 0; i < lenBytes; i++) {
+                            modulusLength = (modulusLength << 8) | binary[pos++];
+                        }
+                    }
+                    
+                    // Skip leading zero if present (for non-negative integers)
+                    if (binary[pos] === 0x00) {
+                        modulusLength--;
+                    }
+                    
+                    // Convert byte length to bit length
+                    bits = modulusLength * 8;
+                    logger.debug(`DKIM key length for selector ${record.selector}: ${bits} bits (${modulusLength} bytes)`);
                 }
-            } catch {
+            } catch (error) {
+                logger.warn(`Failed to determine key length for selector ${record.selector}: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 bits = null;
             }
+            
             keyLengths.push({ selector: record.selector, bits });
             if (bits !== null) {
                 if (bits < 1024) hasWeakKey = true;
                 if (bits > maxKeyLength) maxKeyLength = bits;
             }
         }
+        
         if (hasWeakKey) {
             keyLengthScore = 0;
         } else if (maxKeyLength >= 2048) {
@@ -58,6 +145,7 @@ export class DkimScorer {
         } else if (maxKeyLength >= 1024) {
             keyLengthScore = 3;
         }
+        
         scoreItems.push({
             name: "DKIM Key Length",
             description: "Strength of DKIM keys in DNS: 2048-bit (or higher): 5 points. 1024-bit: 3 points. <1024-bit: 0.",
