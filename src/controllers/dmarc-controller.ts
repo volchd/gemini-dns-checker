@@ -10,48 +10,132 @@ export class DmarcController {
     }
 
     async getDmarcRecord(c: Context) {
+        const startTime = Date.now();
+        const requestId = crypto.randomUUID();
+        
+        logger.info(`DMARC record request received`, { 
+            requestId, 
+            endpoint: '/dmarc/record',
+            userAgent: c.req.header('User-Agent') 
+        });
+
         try {
             const domain = c.req.query('domain');
             
             if (!domain) {
-                return c.json({ error: 'Domain parameter is required' }, 400);
+                logger.warn(`DMARC request missing domain parameter`, { requestId });
+                return c.json({ 
+                    error: 'Domain parameter is required',
+                    requestId 
+                }, 400);
             }
 
-            logger.debug(`DMARC record request for domain: ${domain}`);
+            logger.debug(`DMARC record request for domain: ${domain}`, { requestId });
             const record = await this.dmarcService.getDmarcRecord(domain);
 
             if (!record) {
-                return c.json({ error: 'No DMARC record found' }, 404);
+                const responseTime = Date.now() - startTime;
+                logger.info(`No DMARC record found`, { 
+                    requestId, 
+                    domain,
+                    responseTime 
+                });
+                return c.json({ 
+                    error: 'No DMARC record found',
+                    requestId,
+                    responseTime,
+                    timestamp: new Date().toISOString()
+                }, 404);
             }
 
             // Calculate DMARC score
             const score = this.dmarcScorer.calculateScore(record);
+            const responseTime = Date.now() - startTime;
+            
+            logger.info(`DMARC record retrieved successfully`, { 
+                requestId, 
+                domain,
+                responseTime 
+            });
 
             return c.json({
                 record,
-                score
+                score,
+                requestId,
+                responseTime,
+                timestamp: new Date().toISOString()
             });
         } catch (error) {
-            logger.error('Error in getDmarcRecord controller', error as Error);
-            return c.json({ error: 'Internal server error' }, 500);
+            const responseTime = Date.now() - startTime;
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            
+            logger.error('Error in getDmarcRecord controller', error as Error, { 
+                requestId, 
+                responseTime 
+            });
+            
+            return c.json({ 
+                error: 'Internal server error',
+                requestId,
+                responseTime,
+                timestamp: new Date().toISOString()
+            }, 500);
         }
     }
 
     async validateDmarcRecord(c: Context) {
+        const startTime = Date.now();
+        const requestId = crypto.randomUUID();
+        
+        logger.info(`DMARC validation request received`, { 
+            requestId, 
+            endpoint: '/dmarc/validate',
+            userAgent: c.req.header('User-Agent') 
+        });
+
         try {
             const domain = c.req.query('domain');
             
             if (!domain) {
-                return c.json({ error: 'Domain parameter is required' }, 400);
+                logger.warn(`DMARC validation request missing domain parameter`, { requestId });
+                return c.json({ 
+                    error: 'Domain parameter is required',
+                    requestId 
+                }, 400);
             }
 
-            logger.debug(`DMARC validation request for domain: ${domain}`);
+            logger.debug(`DMARC validation request for domain: ${domain}`, { requestId });
             const validationResult = await this.dmarcService.validateDmarcRecord(domain);
+            const responseTime = Date.now() - startTime;
+            
+            logger.info(`DMARC validation completed successfully`, { 
+                requestId, 
+                domain,
+                isValid: validationResult.isValid,
+                responseTime 
+            });
 
-            return c.json(validationResult);
+            return c.json({
+                ...validationResult,
+                requestId,
+                responseTime,
+                timestamp: new Date().toISOString()
+            });
         } catch (error) {
-            logger.error('Error in validateDmarcRecord controller', error as Error);
-            return c.json({ error: 'Internal server error' }, 500);
+            const responseTime = Date.now() - startTime;
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            
+            logger.error('Error in validateDmarcRecord controller', error as Error, { 
+                requestId, 
+                responseTime 
+            });
+            
+            return c.json({ 
+                error: 'Internal server error',
+                requestId,
+                responseTime,
+                timestamp: new Date().toISOString()
+            }, 500);
         }
     }
 } 
